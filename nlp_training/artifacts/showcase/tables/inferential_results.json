@@ -1,0 +1,28 @@
+{
+  "summary": {
+    "rows": 2982003,
+    "n_categories": 38
+  },
+  "kruskal_wallis": {
+    "statistic": 62621.649355975416,
+    "p_value": 0.0
+  },
+  "chi_square": {
+    "chi2": 356442.10608548543,
+    "p_value": 0.0,
+    "dof": 10,
+    "cramers_v": 0.27665717701072107
+  },
+  "bootstrap_permutation": {
+    "comparison": [
+      "cs",
+      "math"
+    ],
+    "observed_mean_diff": 37.803259999999995,
+    "bootstrap_ci_95": [
+      37.380835999999995,
+      38.206827
+    ],
+    "permutation_p_value": 0.0
+  }
+}

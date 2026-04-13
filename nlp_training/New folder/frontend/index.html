@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Research AI Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260405" />
+  <style>
+    body { background: #06080c; color: #f3f7ff; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-row">
+        <div class="brand-mark">◌</div>
+        <div class="brand">Research AI</div>
+      </div>
+
+      <nav class="side-nav" aria-label="Primary">
+        <button type="button" class="nav-item">Search</button>
+        <button type="button" class="nav-item active">Chat</button>
+        <button type="button" class="nav-item">Voice</button>
+        <button type="button" class="nav-item">Imagine</button>
+      </nav>
+
+      <div class="section-title">Projects</div>
+      <button id="newChatBtn" class="ghost-btn" type="button">+ New Chat</button>
+
+      <div class="section-title">History</div>
+      <div class="history-wrap">
+        <div id="historyList" class="history-list" aria-label="Chat history"></div>
+      </div>
+    </aside>
+
+    <main id="chatMain" class="chat-main">
+      <header class="topbar">
+        <div class="topbar-right">
+          <button type="button" class="top-link">Imagine</button>
+          <button type="button" class="top-link">Private</button>
+        </div>
+      </header>
+
+      <section id="homeHero" class="home-hero" aria-hidden="true">
+        <div class="hero-mark">◌</div>
+        <h1>Research AI</h1>
+      </section>
+
+      <section id="chatBox" class="chat-box" aria-live="polite"></section>
+
+      <form id="chatForm" class="composer" autocomplete="off">
+        <div class="composer-left">⌁</div>
+        <textarea
+          id="chatInput"
+          rows="1"
+          placeholder="How can I help you today?"
+          required
+        ></textarea>
+        <div class="composer-actions">
+          <label for="topK" class="sr-only">Context</label>
+          <input id="topK" type="number" min="1" max="20" value="5" />
+          <button id="sendBtn" type="submit">➤</button>
+        </div>
+      </form>
+
+      <div class="composer-hint">New • Press Enter to send</div>
+    </main>
+  </div>
+  <script src="/static/app.js?v=20260405"></script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arxiv Research AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="shell">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M6 10h8M10 6v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <span class="logo-text">Arxiv<em>AI</em></span>
+        </div>
+        <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <!-- Mode Selector -->
+      <div class="mode-section">
+        <p class="section-label">Mode</p>
+        <div class="mode-pills" id="modePills">
+          <button class="mode-pill active" data-mode="ask">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M5 5.5a2 2 0 1 1 2 2v1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="7" cy="10.5" r=".6" fill="currentColor"/></svg>
+            Ask AI
+          </button>
+          <button class="mode-pill" data-mode="search">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            Search
+          </button>
+          <button class="mode-pill" data-mode="classify">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+            Classify
+          </button>
+          <button class="mode-pill" data-mode="summarize">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3h10M2 6h7M2 9h9M2 12h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            Summarize
+          </button>
+          <button class="mode-pill" data-mode="chat">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M4 13l2-3h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Paper Chat
+          </button>
+        </div>
+      </div>
+
+      <!-- Paper Chat session loader -->
+      <div class="chat-loader-section" id="chatLoaderSection" style="display:none">
+        <p class="section-label">Load Paper</p>
+        <div class="arxiv-loader">
+          <input type="text" id="arxivIdInput" placeholder="arXiv ID e.g. 2303.08774" class="arxiv-input"/>
+          <button id="loadArxivBtn" class="load-btn">Load</button>
+        </div>
+        <div class="or-divider"><span>or</span></div>
+        <label for="pdfUpload" class="upload-label">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 11h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          Upload PDF
+          <input type="file" id="pdfUpload" accept=".pdf,.txt" hidden/>
+        </label>
+        <div id="sessionStatus" class="session-status"></div>
+      </div>
+
+      <!-- Settings -->
+      <div class="settings-section">
+        <p class="section-label">Settings</p>
+        <div class="setting-row">
+          <label for="topKSlider">Results <span id="topKVal">5</span></label>
+          <input type="range" id="topKSlider" min="1" max="15" value="5" class="slider"/>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="history-section">
+        <div class="section-label-row">
+          <p class="section-label">History</p>
+          <button id="clearHistoryBtn" class="icon-btn" title="Clear history">✕</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </div>
+
+      <!-- System status -->
+      <div class="status-bar" id="statusBar">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Checking…</span>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main" id="mainArea">
+      <!-- Top bar -->
+      <div class="topbar">
+        <button class="topbar-btn sidebar-toggle-mobile" id="mobileSidebarToggle">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="topbar-center">
+          <span id="topbarMode" class="topbar-mode-label">Ask AI</span>
+        </div>
+        <button class="topbar-btn" id="newChatBtn" title="New conversation">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <!-- Hero -->
+      <div class="hero" id="hero">
+        <div class="hero-glyph">
+          <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+            <circle cx="28" cy="28" r="27" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+            <circle cx="28" cy="28" r="19" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+            <circle cx="28" cy="28" r="11" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M21 28h14M28 21v14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h1 class="hero-title">Research Intelligence</h1>
+        <p class="hero-sub">Ask questions, search papers, classify research, summarise findings.</p>
+        <div class="quick-chips" id="quickChips">
+          <button class="chip">What is attention mechanism in transformers?</button>
+          <button class="chip">Find papers on diffusion models for image generation</button>
+          <button class="chip">Classify: neural networks for protein folding</button>
+          <button class="chip">Summarize recent advances in quantum computing</button>
+        </div>
+      </div>
+
+      <!-- Chat -->
+      <div class="chat-box" id="chatBox" aria-live="polite"></div>
+
+      <!-- Composer -->
+      <div class="composer-wrap">
+        <div class="composer" id="composer">
+          <div class="composer-prefix" id="composerPrefix">Ask</div>
+          <textarea
+            id="chatInput"
+            rows="1"
+            placeholder="Ask a research question…"
+            aria-label="Message input"
+          ></textarea>
+          <div class="composer-suffix">
+            <button class="send-btn" id="sendBtn" title="Send">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M14 2L2 7l5 2 2 5 5-12z" fill="currentColor"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <p class="composer-hint">Enter ↵ to send · Shift+Enter for new line</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

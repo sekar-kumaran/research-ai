@@ -1,0 +1,40 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Environment files
+.env
+.env.*
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Large/raw data folders (keep trained model artifacts)
+dataset/arxiv_chunks/
+dataset/data/
+dataset/
+
+# Large intermediate processed outputs
+nlp_training/artifacts/processed/cleaned_parts/
+
+# Keep nlp_training runnable while excluding oversized training artifacts
+nlp_training/artifacts/processed/
+nlp_training/artifacts/classification/models/
+
+# Local environments inside project folders
+nlp_training/venv/
+nlp_training/.venv/

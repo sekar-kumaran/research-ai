@@ -1,0 +1,13 @@
+{
+  "memory_safe_mode": true,
+  "train_rows": 2683334,
+  "test_rows": 298669,
+  "vectorizer": "HashingVectorizer",
+  "numeric_columns": [
+    "token_count",
+    "title_chars",
+    "abstract_chars",
+    "title_abstract_ratio",
+    "log_token_count"
+  ]
+}
