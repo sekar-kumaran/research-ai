@@ -1,0 +1,25 @@
+# Secrets and local environment
+.env
+*.local
+
+# Python caches and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime logs
+*.log
+
+# Large generated ML/data artifacts
+artifacts/
+
+# Local screenshots and UI captures
+screen_*.png
+screenshots/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
