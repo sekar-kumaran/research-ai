@@ -26,7 +26,7 @@ python-dotenv>=1.0.0
 
 # ── Cloud LLM / Gemini ─────────────────────────────────────────────────────
 # google-genai: listed for future SDK migration; current impl uses REST via requests.
-google-genai>=1.0.0
+# google-genai>=1.0.0
 
 # ── Hugging Face deployment ────────────────────────────────────────────────
 # gradio: required by HF Gradio Space SDK launcher
