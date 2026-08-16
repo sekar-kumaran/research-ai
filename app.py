@@ -174,23 +174,12 @@ def _launch() -> None:
 
     from research_ai.api.main import app as fastapi_app
 
-    # Hugging Face ZeroGPU heavily depends on Gradio. 
-    # To satisfy its startup checks properly without timing out,
-    # we mount our FastAPI application within a dummy Gradio app.
-    if spaces is not None and hasattr(spaces, "GPU"):
-        @spaces.GPU
-        def _dummy_gpu():
-            pass
-    else:
-        def _dummy_gpu():
-            pass
-
     with gr.Blocks() as demo:
         gr.Markdown("## ZeroGPU Headless Backend")
         # Dummy button to bind the dummy GPU function (satisfies AST and runtime hooks)
         btn = gr.Button("Dummy GPU Task")
         txt = gr.Textbox()
-        btn.click(fn=_dummy_gpu, inputs=txt, outputs=txt)
+        btn.click(fn=dummy_gpu_task, inputs=txt, outputs=txt)
     
     # Mount Gradio at a sub-path and run the combined app
     app = gr.mount_gradio_app(fastapi_app, demo, path="/gradio_wrapper")
@@ -214,7 +203,18 @@ def _launch() -> None:
 try:
     import spaces  # type: ignore
 except ImportError:  # pragma: no cover - Spaces runtime only
-    spaces = None
+    class DummySpaces:
+        def GPU(self, *args, **kwargs):
+            if len(args) == 1 and callable(args[0]):
+                return args[0]
+            def wrapper(f):
+                return f
+            return wrapper
+    spaces = DummySpaces()
+
+@spaces.GPU
+def dummy_gpu_task(x):
+    return x
 
 def _run_startup() -> None:
     """Run the platform startup exactly once, when the app is invoked."""
