@@ -168,18 +168,27 @@ class CloudLLMClient:
                     system_msg = message["content"]
                 else:
                     role = "user" if message["role"] == "user" else "model"
-                    google_messages.append({"role": role, "parts": [{"text": message["content"]}]})
+                    if google_messages and google_messages[-1]["role"] == role:
+                        google_messages[-1]["parts"][0]["text"] += "\n\n" + message["content"]
+                    else:
+                        google_messages.append({"role": role, "parts": [{"text": message["content"]}]})
             payload: dict = {
                 "contents": google_messages,
                 "generationConfig": {"temperature": 0.15, "maxOutputTokens": max_tokens},
             }
             if system_msg:
                 payload["systemInstruction"] = {"parts": [{"text": system_msg}]}
-            data = self._post_with_retry(
-                f"{self.base_url}/models/{self.model}:generateContent?key={self.api_key}", payload
-            )
-            parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-            return "\n".join(p.get("text", "") for p in parts if isinstance(p, dict)).strip()
+            for model_name in (self.model, "gemini-3.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"):
+                url = f"{self.base_url}/models/{model_name}:generateContent?key={self.api_key}"
+                try:
+                    data = self._post_with_retry(url, payload)
+                    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                    return "\n".join(p.get("text", "") for p in parts if isinstance(p, dict)).strip()
+                except requests.HTTPError as exc:
+                    if exc.response is not None and exc.response.status_code == 404:
+                        continue
+                    raise
+            return ""
 
         payload = {
             "model": self.model,

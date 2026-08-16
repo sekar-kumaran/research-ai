@@ -171,8 +171,10 @@ def _launch() -> None:
         os.getenv("ENABLE_PYTHON_EXECUTION", "false"),
     )
 
+    from research_ai.api.main import app as fastapi_app
+
     uvicorn.run(
-        "research_ai.api.main:app",
+        fastapi_app,
         host=host,
         port=port,
         # No --reload in production — it watches the filesystem and wastes RAM

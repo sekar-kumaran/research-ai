@@ -100,19 +100,36 @@
   ═══════════════════════════════════════════════════════════════ -->
   <main class="main" id="main">
 
-    <!-- Mobile topbar -->
+    <!-- ── Topbar ─────────────────────────────────────────────────────────── -->
     <div class="topbar">
-      <button class="topbar-btn" id="mobileSidebarToggle">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <span class="topbar-title" id="topbarTitle">Research Assistant</span>
-      <button class="topbar-btn" id="topbarNewChat" title="New conversation">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </button>
+      <div class="topbar-left">
+        <button class="topbar-btn sidebar-toggle" id="mobileMenuBtn" style="display:none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <span class="topbar-title">Research AI</span>
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-btn" id="exportBtn" title="Export Chat to Markdown">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Export
+        </button>
+        <button class="topbar-btn" id="kgBtn" title="View Knowledge Graph">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+          Graph
+        </button>
+      </div>
     </div>
 
     <!-- Welcome screen (shown when no messages) -->
@@ -204,6 +221,34 @@
         <button class="modal-close" id="modalClose">✕</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       KNOWLEDGE GRAPH MODAL
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="kgOverlay" style="display:none; z-index: 999; align-items: center; justify-content: center;">
+    <div class="modal" style="width: 90%; max-width: 600px; padding: 24px; border-radius: 12px; background: var(--bg-2);">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+        <h2 style="margin: 0; font-size: 18px; color: var(--text);">Knowledge Graph</h2>
+        <button id="kgClose" style="background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 20px;">&times;</button>
+      </div>
+      <div id="kgContent" style="color: var(--text-2); font-size: 14px; max-height: 400px; overflow-y: auto;">
+        Loading knowledge graph...
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       LOGIN MODAL
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="loginOverlay" style="display:none; z-index: 10000; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
+    <div class="modal" style="max-width: 400px; width: 100%; border-radius: 12px; overflow: hidden; padding: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+      <h2 style="margin-top: 0; margin-bottom: 8px;">Authentication Required</h2>
+      <p style="margin-bottom: 24px; color: var(--text-secondary); font-size: 14px;">This platform is protected. Please enter the password to continue.</p>
+      <input type="password" id="loginPassword" placeholder="Enter password" style="width: 100%; padding: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text); margin-bottom: 16px;" />
+      <button id="loginBtn" style="width: 100%; padding: 12px; border-radius: 6px; background: var(--accent); color: white; border: none; font-weight: 600; cursor: pointer;">Login</button>
+      <div id="loginError" style="color: #ef4444; margin-top: 12px; font-size: 13px; display: none;">Invalid password</div>
     </div>
   </div>
 

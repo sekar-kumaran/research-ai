@@ -60,6 +60,15 @@ const modalBody      = $('modalBody');
 const modalClose     = $('modalClose');
 const composerAttach = $('composerAttach');
 const composerFile   = $('composerFile');
+const loginOverlay   = $('loginOverlay');
+const loginPassword  = $('loginPassword');
+const loginBtn       = $('loginBtn');
+const loginError     = $('loginError');
+const exportBtn      = $('exportBtn');
+const kgBtn          = $('kgBtn');
+const kgOverlay      = $('kgOverlay');
+const kgClose        = $('kgClose');
+const kgContent      = $('kgContent');
 
 // ── Theme ──────────────────────────────────────────────────────────────────
 function applyTheme(t) {
@@ -141,11 +150,19 @@ function toast(msg, type = 'info', dur = 4000) {
 }
 
 // ── API helpers ─────────────────────────────────────────────────────────────
+function getToken() {
+  return localStorage.getItem('rai-token') || '';
+}
+
 async function callApi(endpoint, body, method = 'POST') {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch(endpoint, {
     method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    headers,
+    body: method === 'GET' ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
@@ -235,6 +252,51 @@ function createAssistantShell() {
   });
 
   return { wrap, bubble, meta, timeEl, confBadge, intentBadge, srcSection, srcList };
+}
+
+/** Finalize an assistant bubble after streaming completes */
+function finalizeAssistantBubble({ bubble, meta, timeEl, confBadge, intentBadge, srcSection, srcList }, data) {
+  const { sources = [], confidence = 0, intent = '', tools_used = [] } = data;
+
+  // Timestamp
+  timeEl.textContent = nowStr();
+
+  // Confidence badge
+  const pct = Math.round(confidence * 100);
+  const confClass = pct >= 70 ? 'conf-high' : pct >= 40 ? 'conf-mid' : 'conf-low';
+  confBadge.textContent = `${pct}% confidence`;
+  confBadge.className = `confidence-badge ${confClass}`;
+  confBadge.title = `Evidence confidence: ${pct}% (tools: ${tools_used.join(', ')})`;
+
+  // Intent badge (only shown in debug mode or for non-trivial intents)
+  if (intent && intent !== 'research_analysis') {
+    intentBadge.textContent = intent.replace(/_/g, ' ');
+    intentBadge.className = 'intent-badge';
+  }
+
+  meta.style.display = '';
+
+  // Sources
+  if (sources.length) {
+    renderSources(srcList, sources);
+    const label = `Sources (${sources.length})`;
+    srcSection.querySelector('.sources-toggle').childNodes[1].textContent = ' ' + label;
+    srcSection.style.display = '';
+    // Auto-expand sources if 3 or fewer
+    if (sources.length <= 3) {
+      srcList.style.display = '';
+      srcSection.querySelector('.sources-toggle').classList.add('open');
+    }
+  }
+}
+
+/** Instantly append a completed assistant message (used for history) */
+function appendAssistantMessage(text) {
+  const shell = createAssistantShell();
+  shell.bubble.innerHTML = mdToHtml(text);
+  // We don't have historical sources/confidence in the current /conversations endpoint format
+  // so we pass empty data to hide those sections cleanly.
+  finalizeAssistantBubble(shell, { sources: [], confidence: 1.0, intent: '' });
 }
 
 /** Render source cards into the sources list element */
@@ -363,9 +425,13 @@ async function sendMessage(query) {
   }
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    const token = getToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     const res = await fetch('/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         query,
         conversation_id: state.conversationId,
@@ -526,13 +592,39 @@ function renderHistory() {
         <path d="M5.5 1a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zM5.5 3v3l2 1" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
       </svg>
       <span>${esc(item.title)}</span>`;
-    btn.addEventListener('click', () => {
-      // Restore conversation context (new messages will continue the thread)
-      state.conversationId = item.conversationId;
-      chatInput.focus();
-      toast(`Continuing conversation: "${item.title.slice(0, 40)}"`, 'info');
+    btn.addEventListener('click', async () => {
+      await loadConversation(item.conversationId, item.title);
     });
     historyList.appendChild(btn);
+  }
+}
+
+async function loadConversation(id, title) {
+  try {
+    toast(`Loading conversation: "${title.slice(0, 40)}"`, 'info');
+    const data = await callApi(`/conversations/${id}`, {}, 'GET');
+    
+    // Clear chat area and set state
+    state.conversationId = id;
+    chatArea.innerHTML = '';
+    showChat();
+    
+    // Render turns
+    if (data.turns && data.turns.length > 0) {
+      for (const turn of data.turns) {
+        if (turn.role === 'user') {
+          appendUserMessage(turn.content);
+        } else if (turn.role === 'assistant') {
+          appendAssistantMessage(turn.content);
+        }
+      }
+    } else {
+      chatArea.innerHTML = '<div class="history-empty">Conversation is empty.</div>';
+    }
+    chatArea.scrollTop = chatArea.scrollHeight;
+    chatInput.focus();
+  } catch (err) {
+    toast(`Failed to load conversation: ${err.message}`, 'error');
   }
 }
 
@@ -664,9 +756,117 @@ sidebarOv.addEventListener('click', closeSidebar);
 modalClose.addEventListener('click', () => { modalOverlay.style.display = 'none'; });
 modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.style.display = 'none'; });
 
+// ── Topbar Actions ──────────────────────────────────────────────────────────
+if (exportBtn) {
+  exportBtn.addEventListener('click', () => {
+    if (!state.conversationId) return toast('No active conversation to export.', 'info');
+    toast('Preparing export...', 'info');
+    callApi(`/conversations/${state.conversationId}`, {}, 'GET').then(data => {
+      let md = `# Research AI Export\nDate: ${new Date().toLocaleString()}\n\n---\n\n`;
+      if (data.turns) {
+        data.turns.forEach(turn => {
+          md += `### ${turn.role === 'user' ? 'User' : 'Research AI'}\n\n`;
+          md += `${turn.content}\n\n---\n\n`;
+        });
+      }
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `research_ai_${state.conversationId.slice(0, 8)}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('Export complete!', 'ok');
+    }).catch(e => toast('Failed to export conversation.', 'error'));
+  });
+}
+
+if (kgBtn) {
+  kgBtn.addEventListener('click', async () => {
+    kgOverlay.style.display = 'flex';
+    kgContent.innerHTML = 'Loading knowledge graph...';
+    try {
+      const data = await callApi('/knowledge-graph', {}, 'GET');
+      if (data.concepts && Object.keys(data.concepts).length > 0) {
+        let html = '<div style="display:flex; flex-wrap:wrap; gap:8px; padding-top:4px;">';
+        // Sort by count descending
+        const sorted = Object.entries(data.concepts).sort((a, b) => b[1] - a[1]);
+        for (const [concept, count] of sorted) {
+          html += `<span style="padding:6px 12px; background:var(--bg-3); border:1px solid var(--border); border-radius:16px; font-size:13px; color:var(--text); box-shadow:var(--shadow-sm); cursor:default; transition:var(--tx);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+                     <strong>${concept}</strong> <span style="color:var(--text-3); font-size:11px; margin-left:4px;">${count}</span>
+                   </span>`;
+        }
+        html += '</div>';
+        kgContent.innerHTML = html;
+      } else {
+        kgContent.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-3);">No concepts extracted yet. Start chatting about papers to build your knowledge graph!</div>';
+      }
+    } catch (e) {
+      kgContent.innerHTML = '<div style="color:var(--conf-low);">Failed to load knowledge graph.</div>';
+    }
+  });
+}
+if (kgClose) { kgClose.addEventListener('click', () => { kgOverlay.style.display = 'none'; }); }
+kgOverlay.addEventListener('click', e => { if (e.target === kgOverlay) kgOverlay.style.display = 'none'; });
+
+// ── Auth ────────────────────────────────────────────────────────────────────
+async function checkAuth() {
+  try {
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: getToken() ? { 'Authorization': `Bearer ${getToken()}` } : {}
+    });
+    if (res.status === 401) {
+      loginOverlay.style.display = 'flex';
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return true; // Ignore network errors for auth check
+  }
+}
+
+loginBtn.addEventListener('click', async () => {
+  const pwd = loginPassword.value.trim();
+  if (!pwd) return;
+  loginBtn.textContent = 'Verifying...';
+  loginBtn.disabled = true;
+  loginError.style.display = 'none';
+  try {
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${pwd}` }
+    });
+    if (res.ok) {
+      localStorage.setItem('rai-token', pwd);
+      loginOverlay.style.display = 'none';
+      checkHealth();
+      loadModels();
+    } else {
+      loginError.style.display = 'block';
+    }
+  } catch (e) {
+    loginError.style.display = 'block';
+    loginError.textContent = 'Connection error';
+  } finally {
+    loginBtn.textContent = 'Login';
+    loginBtn.disabled = false;
+  }
+});
+
+loginPassword.addEventListener('keydown', e => {
+  if (e.key === 'Enter') loginBtn.click();
+});
+
 // ── Init ────────────────────────────────────────────────────────────────────
-loadHistory();
-showWelcome();
-checkHealth();
-loadModels();
-setInterval(checkHealth, 60_000);
+async function init() {
+  loadHistory();
+  showWelcome();
+  const authed = await checkAuth();
+  if (authed) {
+    checkHealth();
+    loadModels();
+  }
+  setInterval(checkHealth, 60_000);
+}
+init();

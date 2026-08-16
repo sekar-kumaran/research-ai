@@ -159,6 +159,32 @@ async def log_requests(request: Request, call_next):
     response.headers["X-Request-ID"] = request_id
     return response
 
+# ---------------------------------------------------------------------------
+# Authentication middleware
+# Protects API endpoints if APP_PASSWORD is set.
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    app_password = os.getenv("APP_PASSWORD", "").strip()
+    if app_password:
+        path = request.url.path
+        if path.startswith(("/chat", "/metadata", "/citation", "/knowledge-graph", "/pipeline", "/agent", "/ask", "/execution", "/classify", "/search", "/summarize", "/similarity", "/conversations")):
+            auth_header = request.headers.get("Authorization")
+            if not auth_header or not auth_header.startswith("Bearer ") or auth_header.split(" ")[1] != app_password:
+                return Response(content="Unauthorized", status_code=401)
+    return await call_next(request)
+
+@app.post("/login")
+def login(request: Request):
+    auth_header = request.headers.get("Authorization")
+    app_password = os.getenv("APP_PASSWORD", "").strip()
+    if not app_password:
+        return {"status": "ok"}
+    if auth_header and auth_header.startswith("Bearer ") and auth_header.split(" ")[1] == app_password:
+        return {"status": "ok"}
+    raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 
 # ---------------------------------------------------------------------------
 # Helpers
