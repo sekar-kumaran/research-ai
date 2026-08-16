@@ -208,7 +208,7 @@ if spaces is not None and hasattr(spaces, "GPU"):
     # Wrapping a blocking server will cause "GPU task aborted".
     # However, HF Spaces requires at least one @spaces.GPU function to exist
     # for a GPU space to start properly, otherwise it aborts.
-    @spaces.GPU(duration=10)
+    @spaces.GPU
     def _dummy_gpu_fn():
         pass
 
