@@ -184,11 +184,30 @@ def _launch() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Main / Hugging Face Spaces entrypoint
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__" or True:
-    # `or True` ensures this runs when HF imports the file as a module too
+try:
+    import spaces  # type: ignore
+except ImportError:  # pragma: no cover - Spaces runtime only
+    spaces = None
+
+
+def _run_startup() -> None:
+    """Run the platform startup exactly once, when the app is invoked."""
     _check_config()
     _download_artifacts()
     _launch()
+
+
+if spaces is not None and hasattr(spaces, "GPU"):
+    @spaces.GPU
+    def app() -> None:
+        _run_startup()
+else:
+    def app() -> None:
+        _run_startup()
+
+
+if __name__ == "__main__":
+    app()
