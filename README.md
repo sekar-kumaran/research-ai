@@ -1,3 +1,13 @@
+---
+title: Research AI
+emoji: 🚀
+colorFrom: blue
+colorTo: purple
+sdk: gradio
+app_file: app.py
+pinned: false
+---
+
 # Research AI Intelligence Platform
 
 **Version 3.1 · Agentic · Gemini-powered · Hugging Face Ready**
