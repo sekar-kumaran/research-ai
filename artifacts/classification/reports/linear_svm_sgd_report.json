@@ -1,0 +1,41 @@
+{
+  "name": "linear_svm_sgd",
+  "accuracy": 0.7048346055979644,
+  "macro_f1": 0.4903100897622039,
+  "weighted_f1": 0.6809709879739498,
+  "train_rows": 1570,
+  "test_rows": 393,
+  "labels": [
+    "astro-ph",
+    "cond-mat",
+    "cs",
+    "gr-qc",
+    "hep-ex",
+    "hep-lat",
+    "hep-ph",
+    "hep-th",
+    "math",
+    "math-ph",
+    "nlin",
+    "nucl-th",
+    "physics",
+    "q-bio",
+    "quant-ph"
+  ],
+  "report": "              precision    recall  f1-score   support\n\n    astro-ph     0.8684    0.9167    0.8919        72\n    cond-mat     0.6421    0.8714    0.7394        70\n          cs     0.5882    0.5000    0.5405        20\n       gr-qc     0.6364    0.5833    0.6087        12\n      hep-ex     0.6667    0.7500    0.7059         8\n     hep-lat     0.5000    0.4000    0.4444         5\n      hep-ph     0.6429    0.6207    0.6316        29\n      hep-th     0.5714    0.6000    0.5854        20\n        math     0.8295    0.8795    0.8538        83\n     math-ph     0.2500    0.1000    0.1429        10\n        nlin     0.0000    0.0000    0.0000         5\n     nucl-th     0.0000    0.0000    0.0000         5\n     physics     0.5455    0.2222    0.3158        27\n       q-bio     0.5000    0.2000    0.2857         5\n    quant-ph     0.5833    0.6364    0.6087        22\n\n    accuracy                         0.7048       393\n   macro avg     0.5216    0.4853    0.4903       393\nweighted avg     0.6773    0.7048    0.6810       393\n",
+  "config": {
+    "sample_size": 2000,
+    "max_files": 2,
+    "test_size": 0.2,
+    "random_state": 42,
+    "min_class_count": 20,
+    "data_dir": "D:\\main projects\\research_ai_platform_v3.1_final\\dataset\\data",
+    "artifact_dir": "D:\\main projects\\research_ai_platform_v3.1_final\\artifacts\\classification",
+    "promote": false
+  },
+  "metadata": {
+    "max_features": 300000,
+    "ngram_max": 2,
+    "n_jobs": 1
+  }
+}

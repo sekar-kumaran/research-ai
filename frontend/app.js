@@ -69,6 +69,7 @@ const kgBtn          = $('kgBtn');
 const kgOverlay      = $('kgOverlay');
 const kgClose        = $('kgClose');
 const kgContent      = $('kgContent');
+const loginHeaderBtn = $('loginHeaderBtn');
 
 // ── Theme ──────────────────────────────────────────────────────────────────
 function applyTheme(t) {
@@ -334,42 +335,6 @@ function renderSources(srcList, sources) {
     }
     srcList.appendChild(card);
   });
-}
-
-/** Finalize an assistant bubble after streaming completes */
-function finalizeAssistantBubble({ bubble, meta, timeEl, confBadge, intentBadge, srcSection, srcList }, data) {
-  const { sources = [], confidence = 0, intent = '', tools_used = [] } = data;
-
-  // Timestamp
-  timeEl.textContent = nowStr();
-
-  // Confidence badge
-  const pct = Math.round(confidence * 100);
-  const confClass = pct >= 70 ? 'conf-high' : pct >= 40 ? 'conf-mid' : 'conf-low';
-  confBadge.textContent = `${pct}% confidence`;
-  confBadge.className = `confidence-badge ${confClass}`;
-  confBadge.title = `Evidence confidence: ${pct}% (tools: ${tools_used.join(', ')})`;
-
-  // Intent badge (only shown in debug mode or for non-trivial intents)
-  if (intent && intent !== 'research_analysis') {
-    intentBadge.textContent = intent.replace(/_/g, ' ');
-    intentBadge.className = 'intent-badge';
-  }
-
-  meta.style.display = '';
-
-  // Sources
-  if (sources.length) {
-    renderSources(srcList, sources);
-    const label = `Sources (${sources.length})`;
-    srcSection.querySelector('.sources-toggle').childNodes[1].textContent = ' ' + label;
-    srcSection.style.display = '';
-    // Auto-expand sources if 3 or fewer
-    if (sources.length <= 3) {
-      srcList.style.display = '';
-      srcSection.querySelector('.sources-toggle').classList.add('open');
-    }
-  }
 }
 
 // ── Core send flow ──────────────────────────────────────────────────────────
@@ -810,6 +775,13 @@ if (kgClose) { kgClose.addEventListener('click', () => { kgOverlay.style.display
 kgOverlay.addEventListener('click', e => { if (e.target === kgOverlay) kgOverlay.style.display = 'none'; });
 
 // ── Auth ────────────────────────────────────────────────────────────────────
+if (loginHeaderBtn) {
+  loginHeaderBtn.addEventListener('click', () => {
+    loginOverlay.style.display = 'flex';
+    loginPassword.focus();
+  });
+}
+
 async function checkAuth() {
   try {
     const res = await fetch('/login', {

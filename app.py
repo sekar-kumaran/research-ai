@@ -203,13 +203,13 @@ def _run_startup() -> None:
 
 
 if spaces is not None and hasattr(spaces, "GPU"):
-    @spaces.GPU
-    def app() -> None:
-        _run_startup()
-else:
-    def app() -> None:
-        _run_startup()
+    # Do NOT wrap the entire uvicorn server in @spaces.GPU!
+    # A Hugging Face ZeroGPU task has a maximum duration (e.g. 90-120s)
+    # Wrapping a blocking server will cause "GPU task aborted".
+    pass
 
+def app() -> None:
+    _run_startup()
 
 if __name__ == "__main__":
     app()

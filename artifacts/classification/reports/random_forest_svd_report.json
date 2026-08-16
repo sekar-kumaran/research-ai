@@ -1,0 +1,37 @@
+{
+  "name": "random_forest_svd",
+  "accuracy": 0.7010869565217391,
+  "macro_f1": 0.5300505038645522,
+  "weighted_f1": 0.6756681691088547,
+  "train_rows": 734,
+  "test_rows": 184,
+  "labels": [
+    "astro-ph",
+    "cond-mat",
+    "cs",
+    "gr-qc",
+    "hep-ph",
+    "hep-th",
+    "math",
+    "math-ph",
+    "physics",
+    "quant-ph"
+  ],
+  "report": "              precision    recall  f1-score   support\n\n    astro-ph     0.7907    0.8947    0.8395        38\n    cond-mat     0.7778    0.8235    0.8000        34\n          cs     0.8333    0.4545    0.5882        11\n       gr-qc     0.4000    0.3333    0.3636         6\n      hep-ph     0.7857    0.7333    0.7586        15\n      hep-th     0.4286    0.3000    0.3529        10\n        math     0.6667    0.9268    0.7755        41\n     math-ph     0.0000    0.0000    0.0000         5\n     physics     0.2222    0.1667    0.1905        12\n    quant-ph     0.8571    0.5000    0.6316        12\n\n    accuracy                         0.7011       184\n   macro avg     0.5762    0.5133    0.5301       184\nweighted avg     0.6762    0.7011    0.6757       184\n",
+  "config": {
+    "sample_size": 1000,
+    "max_files": 2,
+    "test_size": 0.2,
+    "random_state": 42,
+    "min_class_count": 20,
+    "data_dir": "D:\\main projects\\research_ai_platform_v3.1_final\\dataset\\data",
+    "artifact_dir": "D:\\main projects\\research_ai_platform_v3.1_final\\artifacts\\classification",
+    "promote": false
+  },
+  "metadata": {
+    "max_features": 120000,
+    "svd_components": 32,
+    "n_estimators": 20,
+    "n_jobs": 1
+  }
+}
