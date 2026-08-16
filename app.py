@@ -200,17 +200,7 @@ def _launch() -> None:
 # Main / Hugging Face Spaces entrypoint
 # ---------------------------------------------------------------------------
 
-try:
-    import spaces  # type: ignore
-except ImportError:  # pragma: no cover - Spaces runtime only
-    class DummySpaces:
-        def GPU(self, *args, **kwargs):
-            if len(args) == 1 and callable(args[0]):
-                return args[0]
-            def wrapper(f):
-                return f
-            return wrapper
-    spaces = DummySpaces()
+import spaces  # type: ignore
 
 @spaces.GPU
 def dummy_gpu_task(x):
