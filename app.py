@@ -191,26 +191,18 @@ def _launch() -> None:
 
 try:
     import spaces  # type: ignore
+    
+    @spaces.GPU
+    def _dummy_gpu_fn():
+        pass
 except ImportError:  # pragma: no cover - Spaces runtime only
     spaces = None
-
 
 def _run_startup() -> None:
     """Run the platform startup exactly once, when the app is invoked."""
     _check_config()
     _download_artifacts()
     _launch()
-
-
-if spaces is not None and hasattr(spaces, "GPU"):
-    # Do NOT wrap the entire uvicorn server in @spaces.GPU!
-    # A Hugging Face ZeroGPU task has a maximum duration (e.g. 90-120s)
-    # Wrapping a blocking server will cause "GPU task aborted".
-    # However, HF Spaces requires at least one @spaces.GPU function to exist
-    # for a GPU space to start properly, otherwise it aborts.
-    @spaces.GPU
-    def _dummy_gpu_fn():
-        pass
 
 def app() -> None:
     _run_startup()
