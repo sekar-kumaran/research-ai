@@ -61,6 +61,7 @@ if _env_path.exists():
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 
 from research_ai.api.schemas import (
@@ -388,12 +389,24 @@ def run_agent(req: AgentRequest):
 
 @app.post("/agent/run/stream")
 async def run_agent_stream(req: AgentRequest):
-    out = run_agent(req)
-    text = _primary_text(out)
-    request_id = out.get("request_id", "")
-    mode = out.get("mode", req.mode)
-
     async def event_generator():
+        # Run the blocking orchestration in a thread so the event loop stays responsive.
+        task = asyncio.create_task(run_in_threadpool(run_agent, req))
+        while not task.done():
+            yield ": keepalive\n\n"
+            await asyncio.sleep(1.0)
+        try:
+            out = await task
+        except Exception as exc:
+            err = json.dumps({"event": "error", "message": redact_secrets(str(exc))})
+            yield f"data: {err}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        text = _primary_text(out)
+        request_id = out.get("request_id", "")
+        mode = out.get("mode", req.mode)
+
         yield f"data: {json.dumps({'event': 'start', 'request_id': request_id, 'mode': mode})}\n\n"
         step = max(1, len(text) // 100)
         for i in range(0, len(text), step):
@@ -485,30 +498,36 @@ async def chat_stream(req: ChatMessageRequest):
       data: {"event": "done", "confidence": 0.85, "conversation_id": "..."}
       data: [DONE]
     """
-    try:
-        result = platform.chat(
-            query=req.query,
-            conversation_id=req.conversation_id,
-            session_id=req.session_id,
-            top_k=req.top_k,
-            debug=False,
+    async def event_generator():
+        # Run the blocking pipeline in a thread; emit keepalives while waiting.
+        task = asyncio.create_task(
+            run_in_threadpool(
+                platform.chat,
+                query=req.query,
+                conversation_id=req.conversation_id,
+                session_id=req.session_id,
+                top_k=req.top_k,
+                debug=False,
+            )
         )
-    except Exception as exc:
-        async def error_gen():
+        while not task.done():
+            yield ": keepalive\n\n"
+            await asyncio.sleep(1.0)
+        try:
+            result = await task
+        except Exception as exc:
             err = json.dumps({"event": "error", "message": redact_secrets(str(exc))})
             yield f"data: {err}\n\n"
             yield "data: [DONE]\n\n"
-        return StreamingResponse(error_gen(), media_type="text/event-stream",
-                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            return
 
-    text = result.get("answer", "")
-    sources = result.get("sources", [])
-    confidence = result.get("confidence", 0.0)
-    conversation_id = result.get("conversation_id", "")
-    intent = result.get("intent", "research_analysis")
-    latency_ms = result.get("latency_ms", 0.0)
+        text = result.get("answer", "")
+        sources = result.get("sources", [])
+        confidence = result.get("confidence", 0.0)
+        conversation_id = result.get("conversation_id", "")
+        intent = result.get("intent", "research_analysis")
+        latency_ms = result.get("latency_ms", 0.0)
 
-    async def event_generator():
         # Start event
         yield f"data: {json.dumps({'event': 'start', 'intent': intent, 'conversation_id': conversation_id})}\n\n"
 
@@ -518,12 +537,8 @@ async def chat_stream(req: ChatMessageRequest):
         chunk_size = max(1, len(text) // 80)
         for i in range(0, len(text), chunk_size):
             yield f"data: {json.dumps({'delta': text[i:i + chunk_size]}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0.006)
-
-        # Send structured sources as a separate event
+            await asyncio.sleep(0.01)
         yield f"data: {json.dumps({'event': 'sources', 'sources': sources}, ensure_ascii=False)}\n\n"
-
-        # Done event with metadata
         yield f"data: {json.dumps({'event': 'done', 'confidence': confidence, 'conversation_id': conversation_id, 'latency_ms': latency_ms})}\n\n"
         yield "data: [DONE]\n\n"
 

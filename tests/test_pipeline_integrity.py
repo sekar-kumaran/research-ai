@@ -283,6 +283,45 @@ class TestOrchestratorRetry:
 # ---------------------------------------------------------------------------
 
 class TestHallucinationResistance:
+    def test_grounded_metadata_rag_answer_is_reused_without_second_llm_call(self):
+        """metadata_rag already generated an evidence-grounded answer."""
+        from research_ai.agents.synthesis_agent.service import SynthesisAgent
+
+        cloud = MagicMock()
+        synthesizer = SynthesisAgent(cloud_factory=lambda: cloud)
+        outputs = {
+            "metadata_rag": {
+                "answer": "Grounded answer with citations [1].",
+                "retrieved": [],
+            },
+        }
+
+        result = synthesizer.synthesize_structured(
+            "What changed?",
+            {"intent": "research_analysis"},
+            outputs,
+            quality_score=0.8,
+        )
+
+        assert result["answer"] == "Grounded answer with citations [1]."
+        cloud.generate.assert_not_called()
+
+    def test_conversation_answer_is_reused_without_llm_call(self):
+        """Greetings should stay instant and keep the conversation-tool reply."""
+        from research_ai.agents.synthesis_agent.service import SynthesisAgent
+
+        cloud = MagicMock()
+        synthesizer = SynthesisAgent(cloud_factory=lambda: cloud)
+
+        answer = synthesizer.synthesize(
+            "hi",
+            {"intent": "conversation"},
+            {"conversation": {"answer": "Hello! How can I help you?"}},
+        )
+
+        assert answer == "Hello! How can I help you?"
+        cloud.generate.assert_not_called()
+
     def test_no_retrieval_produces_fallback_not_fabrication(self):
         """When the retrieval index is empty/not-ready, answer must be the
         fallback message, not an LLM-fabricated answer."""

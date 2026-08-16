@@ -22,6 +22,17 @@ pydantic>=2.0.0
 joblib>=1.4.0
 requests>=2.32.0
 pypdf>=5.4.0
+python-dotenv>=1.0.0
+
+# ── Cloud LLM / Gemini ─────────────────────────────────────────────────────
+# google-genai: listed for future SDK migration; current impl uses REST via requests.
+google-genai>=1.0.0
+
+# ── Hugging Face deployment ────────────────────────────────────────────────
+# gradio: required by HF Gradio Space SDK launcher
+gradio>=4.0.0
+# huggingface_hub: downloads large artifacts (classifier.joblib) from HF Dataset repo at startup
+huggingface_hub>=0.23.0
 
 # ── Optional: faster data pipeline ─────────────────────────────────────────
 polars>=1.8.0

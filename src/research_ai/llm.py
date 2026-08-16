@@ -16,6 +16,8 @@ _CLIENT_CACHE: dict[str, "CloudLLMClient"] = {}
 def get_cloud_client() -> "CloudLLMClient":
     """Return a cached CloudLLMClient or raise ValueError if config is missing."""
     provider = os.getenv("CLOUD_LLM_PROVIDER", "groq").strip().lower()
+    if provider == "gemini":
+        provider = "google"
     if provider not in _CLIENT_CACHE:
         _CLIENT_CACHE[provider] = CloudLLMClient()
     return _CLIENT_CACHE[provider]
@@ -35,6 +37,9 @@ class CloudLLMClient:
 
     def __init__(self) -> None:
         self.provider = os.getenv("CLOUD_LLM_PROVIDER", "groq").strip().lower()
+        if self.provider == "gemini":
+            self.provider = "google"
+
         if self.provider == "groq":
             self.base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
             self.model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
@@ -45,20 +50,39 @@ class CloudLLMClient:
             self._api_key_env = "OPENROUTER_API_KEY"
         elif self.provider == "google":
             self.base_url = os.getenv("GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
-            self.model = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
-            self._api_key_env = "GOOGLE_API_KEY"
+            # GEMINI_MODEL is the canonical HF name; GOOGLE_MODEL kept for backward compat
+            self.model = (
+                os.getenv("GEMINI_MODEL")
+                or os.getenv("GOOGLE_MODEL")
+                or "gemini-3.5-flash"
+            )
+            self._api_key_env = "GEMINI_API_KEY"  # primary; fallback handled in .api_key
         elif self.provider == "ollama":
             self.base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
             self.model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
             self._api_key_env = ""  # Ollama needs no key
         else:
             raise ValueError(f"Unsupported CLOUD_LLM_PROVIDER: '{self.provider}'. "
-                             f"Choose from: groq, openrouter, google, ollama.")
+                             f"Choose from: groq, openrouter, google, gemini, ollama.")
 
     @property
     def api_key(self) -> str:
         if self.provider == "ollama":
             return "ollama"  # Ollama accepts any non-empty string
+        if self.provider == "google":
+            # Check GEMINI_API_KEY first (canonical HF Secrets name),
+            # then fall back to GOOGLE_API_KEY for backward compatibility.
+            key = (
+                os.getenv("GEMINI_API_KEY", "").strip()
+                or os.getenv("GOOGLE_API_KEY", "").strip()
+            )
+            if not key:
+                raise ValueError(
+                    "GEMINI_API_KEY is not configured. "
+                    "Please set it as a Hugging Face Space Secret: "
+                    "Settings → Repository secrets → New secret → Name: GEMINI_API_KEY"
+                )
+            return key
         key = os.getenv(self._api_key_env, "").strip()
         if not key:
             raise ValueError(
@@ -111,7 +135,7 @@ class CloudLLMClient:
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
                 "generationConfig": {"temperature": 0.15, "maxOutputTokens": max_tokens},
             }
-            for model_name in (self.model, "gemini-2.0-flash-lite", "gemini-1.5-flash"):
+            for model_name in (self.model, "gemini-3.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"):
                 url = f"{self.base_url}/models/{model_name}:generateContent?key={self.api_key}"
                 try:
                     data = self._post_with_retry(url, payload)

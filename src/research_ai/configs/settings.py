@@ -40,11 +40,24 @@ class LLMSettings:
     openrouter_api_key: str = field(default_factory=lambda: os.getenv("OPENROUTER_API_KEY", ""))
     openrouter_model: str = field(default_factory=lambda: os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free"))
     openrouter_base_url: str = field(default_factory=lambda: os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"))
-    google_api_key: str = field(default_factory=lambda: os.getenv("GOOGLE_API_KEY", ""))
-    google_model: str = field(default_factory=lambda: os.getenv("GOOGLE_MODEL", "gemini-2.0-flash"))
+    google_api_key: str = field(default_factory=lambda: os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY", ""))
+    google_model: str = field(default_factory=lambda: os.getenv("GOOGLE_MODEL") or os.getenv("GEMINI_MODEL", "gemini-3.5-flash"))
     google_base_url: str = field(default_factory=lambda: os.getenv("GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"))
+    # Canonical HF Secrets names — checked first, fall back to GOOGLE_* for compat
+    gemini_api_key: str = field(default_factory=lambda: (
+        os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
+    ))
+    gemini_model: str = field(default_factory=lambda: (
+        os.getenv("GEMINI_MODEL") or os.getenv("GOOGLE_MODEL") or "gemini-3.5-flash"
+    ))
     ollama_model: str = field(default_factory=lambda: os.getenv("OLLAMA_MODEL", "qwen2.5:3b"))
     ollama_base_url: str = field(default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"))
+
+    @property
+    def effective_provider(self) -> str:
+        if self.backend == "ollama":
+            return "ollama"
+        return self.provider
 
 
 @dataclass(frozen=True)
@@ -68,13 +81,21 @@ class ExecutionSettings:
 
 
 @dataclass(frozen=True)
+class ServerSettings:
+    host: str = field(default_factory=lambda: os.getenv("HOST", "0.0.0.0"))
+    # 7860 is the standard Hugging Face Spaces port; local dev typically uses 8000
+    port: int = field(default_factory=lambda: int(os.getenv("PORT", "7860")))
+    allowed_origins: str = field(default_factory=lambda: os.getenv("ALLOWED_ORIGINS", "*"))
+
+
+@dataclass(frozen=True)
 class Settings:
     paths: Paths = field(default_factory=Paths)
     llm: LLMSettings = field(default_factory=LLMSettings)
     retrieval: RetrievalSettings = field(default_factory=RetrievalSettings)
     execution: ExecutionSettings = field(default_factory=ExecutionSettings)
+    server: ServerSettings = field(default_factory=ServerSettings)
 
 
 def load_settings() -> Settings:
     return Settings()
-

@@ -336,19 +336,27 @@ async function sendMessage(query) {
   let accumulated = '';
   let streamDone = false;
 
-  // 90-second hard timeout
-  const timeout = setTimeout(() => {
-    if (!streamDone) {
-      if (!accumulated) {
-        shell.bubble.innerHTML = '<em>Response timed out. Please try again.</em>';
+  // Inactivity timeout: reset when any SSE data arrives (including keepalive).
+  const timeoutMs = 120_000;
+  let timeoutHandle = null;
+
+  function armTimeout() {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+    timeoutHandle = setTimeout(() => {
+      if (!streamDone) {
+        if (!accumulated) {
+          shell.bubble.innerHTML = '<em>Response timed out. Please try again.</em>';
+        }
+        finishStreaming();
       }
-      finishStreaming();
-    }
-  }, 90_000);
+    }, timeoutMs);
+  }
+
+  armTimeout();
 
   function finishStreaming() {
     streamDone = true;
-    clearTimeout(timeout);
+    if (timeoutHandle) clearTimeout(timeoutHandle);
     state.streaming = false;
     sendBtn.disabled = false;
     chatArea.scrollTop = chatArea.scrollHeight;
@@ -380,11 +388,13 @@ async function sendMessage(query) {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      armTimeout();
       buf += decoder.decode(value, { stream: true });
       const parts = buf.split('\n\n');
       buf = parts.pop() || '';
 
       for (const part of parts) {
+        armTimeout();
         const line = part.replace(/^data: /, '').trim();
         if (line === '[DONE]') { break; }
         if (!line) continue;

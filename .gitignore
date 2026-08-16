@@ -1,25 +1,49 @@
-# Secrets and local environment
+# ── Secrets — never commit real keys ─────────────────────────────────────────
 .env
 *.local
 
-# Python caches and test caches
+# ── Python caches ─────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
+*.pyo
 .pytest_cache/
 
-# Runtime logs
+# ── Virtual environments ───────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Runtime logs ──────────────────────────────────────────────────────────────
 *.log
 
-# Large generated ML/data artifacts
-artifacts/
+# ── Raw dataset (6.5 GB — not needed at runtime, do not commit) ───────────────
+dataset/
 
-# Local screenshots and UI captures
+# ── Large intermediate training artifacts (not needed at runtime) ─────────────
+# The runtime-critical artifacts (similarity/, classification/) ARE tracked.
+artifacts/processed/
+artifacts/showcase/
+artifacts/feature_engineering/
+
+# ── Large ML models — too big to commit directly (use Git LFS or HF Dataset) ─
+# classifier.joblib ~608 MB, kmeans.joblib ~80 MB
+artifacts/classification/classifier.joblib
+artifacts/clustering/kmeans.joblib
+artifacts/clustering/cluster_assignments.parquet
+
+# ── Local screenshots and UI captures ────────────────────────────────────────
 screen_*.png
 screenshots/
 
-# OS/editor noise
+# ── OS / editor noise ────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# ── Server log files ─────────────────────────────────────────────────────────
+server*.log
+server_run*.log
+
