@@ -567,8 +567,8 @@ function startNewChat() {
   sendBtn.disabled = true;
   showWelcome();
 }
-$('newChatBtn').addEventListener('click', startNewChat);
-$('topbarNewChat').addEventListener('click', startNewChat);
+if ($('newChatBtn')) $('newChatBtn').addEventListener('click', startNewChat);
+if ($('topbarNewChat')) $('topbarNewChat').addEventListener('click', startNewChat);
 
 // ── History ─────────────────────────────────────────────────────────────────
 function addToHistory(title) {
