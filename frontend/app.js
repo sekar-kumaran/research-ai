@@ -180,10 +180,12 @@ async function callApi(endpoint, body, method = 'POST') {
 
 // ── Welcome / Chat visibility ──────────────────────────────────────────────
 function showChat() {
+  document.getElementById('main').classList.remove('welcome-active');
   welcome.style.display = 'none';
   chatArea.style.display = 'flex';
 }
 function showWelcome() {
+  document.getElementById('main').classList.add('welcome-active');
   welcome.style.display = '';
   chatArea.style.display = 'none';
 }
@@ -381,6 +383,41 @@ async function sendMessage(query) {
 
   armTimeout();
 
+  const msgSteps = document.createElement('div');
+  msgSteps.className = 'msg-steps';
+  shell.bubble.parentNode.insertBefore(msgSteps, shell.bubble);
+  
+  const stepMessages = [
+    "Analyzing question intent...",
+    "Selecting ML models...",
+    "Retrieving vector embeddings...",
+    "Extracting paper context...",
+    "Processing with LLM..."
+  ];
+  let currentStepIdx = 0;
+  
+  function advanceStep() {
+    if (accumulated || currentStepIdx >= stepMessages.length) {
+      if (msgSteps.parentNode) msgSteps.style.display = 'none';
+      return;
+    }
+    // Mark previous as completed
+    const prev = msgSteps.querySelector('.msg-step.active');
+    if (prev) {
+      prev.classList.remove('active');
+      prev.classList.add('completed');
+    }
+    // Add new step
+    const stepEl = document.createElement('div');
+    stepEl.className = 'msg-step active';
+    stepEl.innerHTML = `<div class="step-icon"></div> <span>${stepMessages[currentStepIdx]}</span>`;
+    msgSteps.appendChild(stepEl);
+    currentStepIdx++;
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+  
+  advanceStep(); // Initial step
+
   function finishStreaming() {
     streamDone = true;
     if (timeoutHandle) clearTimeout(timeoutHandle);
@@ -428,13 +465,17 @@ async function sendMessage(query) {
         armTimeout();
         const line = part.replace(/^data: /, '').trim();
         if (line === '[DONE]') { break; }
+        if (line === ': keepalive') { advanceStep(); continue; }
         if (!line) continue;
         try {
           const obj = JSON.parse(line);
 
           if (obj.delta !== undefined) {
             // Streaming text delta
-            if (!accumulated) shell.bubble.innerHTML = '';  // clear typing dots
+            if (!accumulated) {
+               shell.bubble.innerHTML = '';  // clear typing dots
+               if (msgSteps.parentNode) msgSteps.style.display = 'none'; // Hide steps
+            }
             accumulated += obj.delta;
             shell.bubble.innerHTML = mdToHtml(accumulated);
             chatArea.scrollTop = chatArea.scrollHeight;
@@ -815,6 +856,9 @@ loginBtn.addEventListener('click', async () => {
       checkHealth();
       loadModels();
     } else {
+      let msg = 'Invalid password';
+      try { const err = await res.json(); if (err.detail) msg = err.detail; } catch (e) {}
+      loginError.textContent = msg;
       loginError.style.display = 'block';
     }
   } catch (e) {
