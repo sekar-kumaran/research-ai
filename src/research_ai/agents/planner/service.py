@@ -109,6 +109,11 @@ AVAILABLE TOOLS (use ONLY these names):
     Purpose : Respond to greetings, small talk, and non-research queries.
     Args    : {"query": "<string>"}
     When    : Query is a greeting, thanks, or clearly non-research.
+
+15. cluster_papers
+    Purpose : Group a set of papers into topics or clusters using a KMeans clustering model.
+    Args    : {"papers": [<list of paper dicts>]}
+    When    : User asks to group, cluster, or organize papers into distinct topics.
 """
 
 FEW_SHOT = """
@@ -411,6 +416,8 @@ class PlannerAgent:
             calls.append(ToolCall("metadata_analyse", {"from": "search_results"}))
         if any(t in lower for t in ("citation", "influence", "cited", "reference", "related work")):
             calls.append(ToolCall("citation_proxy", {"from": "search_results"}))
+        if any(t in lower for t in ("cluster", "group", "topic", "categorize")):
+            calls.append(ToolCall("cluster_papers", {"from": "search_results"}))
         if any(t in lower for t in ("calculate", "compute", "statistic", "plot", "simulate", "run code")):
             calls.append(ToolCall("python_execute", {"code": text or ""}))
         calls.append(ToolCall("metadata_rag", {"query": q, "top_k": k}))

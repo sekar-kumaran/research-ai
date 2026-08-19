@@ -45,7 +45,8 @@ from research_ai.remote_ml import (
     RemoteClassifierService,
     RemoteHybridSearchService,
     RemoteMethodologyExtractor,
-    RemoteScientificSummarizer
+    RemoteScientificSummarizer,
+    RemoteClusteringService
 )
 from research_ai.ollama_manager import OllamaModelManager
 from research_ai.research.citation_engine import CitationEngine
@@ -89,6 +90,7 @@ class ResearchAIPlatform:
         self.summarizer = RemoteScientificSummarizer(hf_space_id)
         self.similarity = SimilarityService(self.embedding_service)
         self.methodology = RemoteMethodologyExtractor(hf_space_id)
+        self.clustering = RemoteClusteringService(hf_space_id)
         self.ranking = RankingService()
         self.citation_graph = CitationGraphService()
 
@@ -166,6 +168,7 @@ class ResearchAIPlatform:
             "classify_query":       self._classify_query,
             "summarize":            self._summarize,
             "methodology_extract":  self._methodology_extract,
+            "cluster_papers":       self._cluster_papers,
             "citation_signals":     self._citation_signals,
             # Research intelligence
             "trend_analysis":       self._trend_analysis,
@@ -218,6 +221,9 @@ class ResearchAIPlatform:
             for p in (papers or [])[:6]
         )
         return self.methodology.extract(source)
+
+    def _cluster_papers(self, papers: list | None = None, **_) -> dict:
+        return self.clustering.cluster_papers(papers or [])
 
     def _citation_signals(self, papers: list | None = None, **_) -> dict:
         return self.citation_graph.related_signals(papers or [])

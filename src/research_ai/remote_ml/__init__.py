@@ -2,7 +2,8 @@ from .proxy_services import (
     RemoteClassifierService,
     RemoteHybridSearchService,
     RemoteMethodologyExtractor,
-    RemoteScientificSummarizer
+    RemoteScientificSummarizer,
+    RemoteClusteringService
 )
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "RemoteHybridSearchService",
     "RemoteMethodologyExtractor",
     "RemoteScientificSummarizer",
+    "RemoteClusteringService"
 ]

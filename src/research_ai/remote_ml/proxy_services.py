@@ -92,3 +92,19 @@ class RemoteMethodologyExtractor:
         except Exception as e:
             logger.error(f"RemoteMethodologyExtractor error: {e}")
             return {"error": str(e)}
+
+class RemoteClusteringService:
+    def __init__(self, hf_space_id: str):
+        self.hf_space_id = hf_space_id
+
+    def cluster_papers(self, papers: list[dict]) -> dict:
+        try:
+            client = RemoteMLClient.get_client(self.hf_space_id)
+            result = client.predict(
+                papers=papers,
+                api_name="/cluster"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"RemoteClusteringService error: {e}")
+            return {"error": str(e)}
