@@ -111,6 +111,10 @@ class RemoteScientificSummarizer:
     def __init__(self, hf_space_id: str):
         self.hf_space_id = hf_space_id
 
+    @property
+    def ready(self) -> bool:
+        return True
+
     def summarize(self, text: str) -> str:
         try:
             client = RemoteMLClient.get_client(self.hf_space_id)
@@ -130,6 +134,10 @@ class RemoteMethodologyExtractor:
     def __init__(self, hf_space_id: str):
         self.hf_space_id = hf_space_id
 
+    @property
+    def ready(self) -> bool:
+        return True
+
     def extract(self, text: str) -> dict:
         try:
             client = RemoteMLClient.get_client(self.hf_space_id)
@@ -147,6 +155,10 @@ class RemoteMethodologyExtractor:
 class RemoteClusteringService:
     def __init__(self, hf_space_id: str):
         self.hf_space_id = hf_space_id
+
+    @property
+    def ready(self) -> bool:
+        return True
 
     def cluster_papers(self, papers: list[dict]) -> dict:
         try:
