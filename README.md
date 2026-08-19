@@ -3,9 +3,7 @@ title: Research AI
 emoji: 🚀
 colorFrom: blue
 colorTo: purple
-sdk: gradio
-sdk_version: "4.36.1"
-app_file: app.py
+sdk: docker
 pinned: false
 ---
 
