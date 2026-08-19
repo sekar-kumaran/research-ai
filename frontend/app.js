@@ -574,12 +574,20 @@ if ($('topbarNewChat')) $('topbarNewChat').addEventListener('click', startNewCha
 
 // ── History ─────────────────────────────────────────────────────────────────
 function addToHistory(title) {
-  const entry = {
-    id: Date.now().toString(),
-    title: title.slice(0, 60),
-    conversationId: state.conversationId,
-  };
-  state.history.unshift(entry);
+  const existingIdx = state.history.findIndex(item => item.conversationId === state.conversationId);
+  if (existingIdx !== -1) {
+    // If it exists, move it to the top (but keep its original title)
+    const [existing] = state.history.splice(existingIdx, 1);
+    state.history.unshift(existing);
+  } else {
+    // New conversation
+    const entry = {
+      id: Date.now().toString(),
+      title: title.slice(0, 60),
+      conversationId: state.conversationId,
+    };
+    state.history.unshift(entry);
+  }
   if (state.history.length > 50) state.history.pop();
   renderHistory();
   try { localStorage.setItem('rai-history', JSON.stringify(state.history.slice(0, 30))); } catch (_) {}
@@ -632,7 +640,12 @@ async function loadConversation(id, title) {
     chatArea.scrollTop = chatArea.scrollHeight;
     chatInput.focus();
   } catch (err) {
-    toast(`Failed to load conversation: ${err.message}`, 'error');
+    if (err.message && err.message.includes('404')) {
+      toast(`Conversation expired from server. Starting new chat.`, 'info');
+      startNewChat();
+    } else {
+      toast(`Failed to load conversation: ${err.message}`, 'error');
+    }
   }
 }
 

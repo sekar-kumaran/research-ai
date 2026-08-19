@@ -346,17 +346,27 @@ class SynthesisAgent:
         # Search results — build a numbered list
         for key in ("hybrid_search", "smart_retrieve"):
             val = outputs.get(key, {})
-            if isinstance(val, dict) and val.get("results"):
-                lines = [f"Found {val.get('count', 0)} relevant papers:"]
-                for i, p in enumerate(val["results"][:6], 1):
-                    pid = p.get("paper_id", "")
-                    link = f" — arxiv.org/abs/{pid}" if pid else ""
-                    lines.append(f"{i}. {p.get('title', 'Untitled')} ({p.get('year', '')}){link}")
-                    if p.get("abstract"):
-                        lines.append(f"   {str(p['abstract'])[:200]}…")
-                return "\n".join(lines)
+            if isinstance(val, dict):
+                results = val.get("results")
+                if results:
+                    lines = [f"Found {val.get('count', 0)} relevant papers:"]
+                    for i, p in enumerate(results[:6], 1):
+                        pid = p.get("paper_id", "")
+                        link = f" — arxiv.org/abs/{pid}" if pid else ""
+                        lines.append(f"{i}. {p.get('title', 'Untitled')} ({p.get('year', '')}){link}")
+                        if p.get("abstract"):
+                            lines.append(f"   {str(p['abstract'])[:200]}…")
+                    return "\n".join(lines)
+                elif "results" in val and not results:
+                    # Empty results list from search
+                    clf = outputs.get("classify_query", {})
+                    cat = clf.get("predicted_category") if isinstance(clf, dict) else None
+                    msg = "I searched the research index but found no matching papers."
+                    if cat:
+                        msg += f" (Predicted category: {cat})"
+                    return msg
 
-        # Classification only
+        # Classification only (if search wasn't even called)
         clf = outputs.get("classify_query", {})
         if isinstance(clf, dict) and clf.get("predicted_category"):
             return f"Predicted arXiv category: {clf['predicted_category']}"
