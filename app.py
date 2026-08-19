@@ -149,7 +149,6 @@ def _download_artifacts() -> None:
 
 def _launch() -> None:
     import uvicorn
-    import gradio as gr
 
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "7860"))
@@ -174,23 +173,11 @@ def _launch() -> None:
 
     from research_ai.api.main import app as fastapi_app
 
-    with gr.Blocks() as demo:
-        gr.Markdown("## ZeroGPU Headless Backend")
-        # Dummy button to bind the dummy GPU function (satisfies AST and runtime hooks)
-        btn = gr.Button("Dummy GPU Task")
-        txt = gr.Textbox()
-        btn.click(fn=dummy_gpu_task, inputs=txt, outputs=txt)
-    
-    # Mount Gradio at a sub-path and run the combined app
-    app = gr.mount_gradio_app(fastapi_app, demo, path="/gradio_wrapper")
-
     uvicorn.run(
-        app,
+        fastapi_app,
         host=host,
         port=port,
-        # No --reload in production — it watches the filesystem and wastes RAM
         reload=False,
-        # workers=1 keeps memory usage low on ZeroGPU free hardware
         workers=1,
         log_level="info",
     )
@@ -199,12 +186,6 @@ def _launch() -> None:
 # ---------------------------------------------------------------------------
 # Main / Hugging Face Spaces entrypoint
 # ---------------------------------------------------------------------------
-
-import spaces  # type: ignore
-
-@spaces.GPU
-def dummy_gpu_task(x):
-    return x
 
 def _run_startup() -> None:
     """Run the platform startup exactly once, when the app is invoked."""
