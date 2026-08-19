@@ -280,23 +280,29 @@ class PlannerAgent:
         is_ollama = getattr(cloud, "provider", "") == "ollama"
         sys = _OLLAMA_SYSTEM_PROMPT if is_ollama else SYSTEM_PROMPT
         max_tok = 200 if is_ollama else 600
-        try:
-            raw = cloud.generate(prompt, max_tokens=max_tok, system=sys)
-            parsed = self._parse_json(raw)
-            calls = self._parse_calls(parsed)
-            if not calls:
-                raise ValueError("LLM planner produced zero valid tool calls.")
-            return ResearchPlan(
-                intent=str(parsed.get("intent") or "research_analysis"),
-                query=str(parsed.get("query") or query),
-                top_k=self._clamp(parsed.get("top_k") or top_k),
-                calls=calls,
-                reason=str(parsed.get("reason") or "llm_planner"),
-                used_fallback=False,
-            )
-        except Exception as exc:
-            logger.warning("LLM planner failed (%s) — using heuristic fallback.", exc)
-            return self._fallback_plan(mode_hint, query, top_k, title, abstract, text, session_id)
+        
+        for attempt in range(2):
+            try:
+                raw = cloud.generate(prompt, max_tokens=max_tok, system=sys)
+                parsed = self._parse_json(raw)
+                calls = self._parse_calls(parsed)
+                if not calls:
+                    raise ValueError("LLM planner produced zero valid tool calls.")
+                return ResearchPlan(
+                    intent=str(parsed.get("intent") or "research_analysis"),
+                    query=str(parsed.get("query") or query),
+                    top_k=self._clamp(parsed.get("top_k") or top_k),
+                    calls=calls,
+                    reason=str(parsed.get("reason") or "llm_planner"),
+                    used_fallback=False,
+                )
+            except Exception as exc:
+                if attempt == 0:
+                    logger.warning("LLM planner JSON parse error on attempt 1 (%s). Retrying...", exc)
+                    prompt += f"\n\nYOUR PREVIOUS OUTPUT FAILED TO PARSE AS JSON: {exc}\nPlease output strictly valid JSON, checking for trailing or missing commas and unescaped quotes."
+                else:
+                    logger.warning("LLM planner failed on attempt 2 (%s) — using heuristic fallback.", exc)
+                    return self._fallback_plan(mode_hint, query, top_k, title, abstract, text, session_id)
 
     # ------------------------------------------------------------------
     # Private
