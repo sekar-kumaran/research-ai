@@ -463,9 +463,11 @@ async function sendMessage(query) {
 
       for (const part of parts) {
         armTimeout();
-        const line = part.replace(/^data: /, '').trim();
+        const rawLine = part.trim();
+        const line = rawLine.replace(/^data:\s*/, '').trim();
         if (line === '[DONE]') { break; }
-        if (line === ': keepalive') { advanceStep(); continue; }
+        // Backend sends ": keepalive" (SSE comment, no data: prefix)
+        if (rawLine === ': keepalive' || rawLine === ':keepalive') { advanceStep(); continue; }
         if (!line) continue;
         try {
           const obj = JSON.parse(line);
@@ -753,14 +755,17 @@ const sidebarOv = $('sidebarOverlay');
 function openSidebar() { sidebar.classList.add('open'); sidebarOv.classList.add('visible'); }
 function closeSidebar() { sidebar.classList.remove('open'); sidebarOv.classList.remove('visible'); }
 
-$('mobileSidebarToggle').addEventListener('click', () =>
-  sidebar.classList.contains('open') ? closeSidebar() : openSidebar()
-);
-sidebarOv.addEventListener('click', closeSidebar);
+const mobileSidebarToggle = $('mobileSidebarToggle');
+if (mobileSidebarToggle) {
+  mobileSidebarToggle.addEventListener('click', () =>
+    sidebar.classList.contains('open') ? closeSidebar() : openSidebar()
+  );
+}
+if (sidebarOv) sidebarOv.addEventListener('click', closeSidebar);
 
 // ── Paper modal ─────────────────────────────────────────────────────────────
-modalClose.addEventListener('click', () => { modalOverlay.style.display = 'none'; });
-modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.style.display = 'none'; });
+if (modalClose) modalClose.addEventListener('click', () => { modalOverlay.style.display = 'none'; });
+if (modalOverlay) modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.style.display = 'none'; });
 
 // ── Topbar Actions ──────────────────────────────────────────────────────────
 if (exportBtn) {
@@ -824,19 +829,46 @@ if (loginHeaderBtn) {
 }
 
 async function checkAuth() {
+  const token = getToken();
+  // If no token stored and APP_PASSWORD is set, we'll know from 401 on health check
+  // Try /health first (unprotected) to see if auth is even required
   try {
-    const res = await fetch('/login', {
-      method: 'POST',
-      headers: getToken() ? { 'Authorization': `Bearer ${getToken()}` } : {}
-    });
-    if (res.status === 401) {
-      loginOverlay.style.display = 'flex';
-      return false;
+    const healthRes = await fetch('/health');
+    if (healthRes.ok) {
+      const data = await healthRes.json();
+      // If server is up without auth, no login needed
+      if (!token) {
+        // Try a protected endpoint to check if password is required
+        const authCheck = await fetch('/login', {
+          method: 'POST',
+          headers: {}
+        });
+        if (authCheck.status === 401) {
+          // Password required but none stored — show login
+          loginOverlay.style.display = 'flex';
+          setTimeout(() => loginPassword.focus(), 100);
+          return false;
+        }
+        return true;
+      }
+      // Token is stored — validate it
+      const authCheck = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (authCheck.status === 401) {
+        localStorage.removeItem('rai-token');
+        loginOverlay.style.display = 'flex';
+        setTimeout(() => loginPassword.focus(), 100);
+        return false;
+      }
+      return true;
     }
-    return true;
   } catch (e) {
-    return true; // Ignore network errors for auth check
+    // Network error — allow usage, auth will fail on actual API calls
+    return true;
   }
+  return true;
 }
 
 loginBtn.addEventListener('click', async () => {

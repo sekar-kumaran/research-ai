@@ -201,11 +201,7 @@ class ResearchAIPlatform:
     ) -> dict:
         result = self.retriever.search(query, top_k=top_k, filters=filters, candidate_k=candidate_k)
         if result.get("results"):
-            # Category-aware ranking
-            clf = self.classifier.classify(query, query)
-            preferred = clf.get("predicted_category") if not clf.get("error") else None
-            result["results"] = self.ranking.rank(result["results"], preferred_category=preferred)
-            # Feed into knowledge graph
+            # Feed into knowledge graph (no extra HF call needed)
             self.knowledge_graph.ingest_papers(result["results"])
             self.knowledge_graph.ingest_query(query)
         return result
