@@ -38,11 +38,15 @@ from research_ai.llm import get_cloud_client
 from research_ai.memory.conversation_store import ConversationStore
 from research_ai.memory.knowledge_graph import KnowledgeGraph
 from research_ai.ml_models.citation_graph import CitationGraphService
-from research_ai.ml_models.classifier import ClassifierService
-from research_ai.ml_models.methodology_extractor import MethodologyExtractor
 from research_ai.ml_models.ranking import RankingService
 from research_ai.ml_models.similarity import SimilarityService
-from research_ai.ml_models.summarizer import ScientificSummarizer
+import os
+from research_ai.remote_ml import (
+    RemoteClassifierService,
+    RemoteHybridSearchService,
+    RemoteMethodologyExtractor,
+    RemoteScientificSummarizer
+)
 from research_ai.ollama_manager import OllamaModelManager
 from research_ai.research.citation_engine import CitationEngine
 from research_ai.research.metadata import MetadataService
@@ -74,16 +78,17 @@ class ResearchAIPlatform:
             (lambda: get_cloud_client()) if settings.llm.backend == "cloud" else None
         )
 
+        hf_space_id = os.environ.get("HF_SPACE_ID", "sekarkumaran461/research-ai")
+        
         # --- Core infrastructure ---
         self.embedding_service = EmbeddingService(self._resolve_embedding_model(settings))
-        self.vector_store = FaissVectorStore.from_artifacts(settings.paths.similarity_dir)
-        self.retriever = HybridSearchService(self.embedding_service, self.vector_store)
+        self.retriever = RemoteHybridSearchService(hf_space_id)
 
         # --- ML models ---
-        self.classifier = ClassifierService.from_artifacts(settings.paths.classifier_dir)
-        self.summarizer = ScientificSummarizer()
+        self.classifier = RemoteClassifierService(hf_space_id)
+        self.summarizer = RemoteScientificSummarizer(hf_space_id)
         self.similarity = SimilarityService(self.embedding_service)
-        self.methodology = MethodologyExtractor()
+        self.methodology = RemoteMethodologyExtractor(hf_space_id)
         self.ranking = RankingService()
         self.citation_graph = CitationGraphService()
 
@@ -405,7 +410,7 @@ class ResearchAIPlatform:
 
     @property
     def indexed_paper_count(self) -> int:
-        return self.vector_store.paper_count
+        return 0  # Remote index handles this
 
     @staticmethod
     def _resolve_embedding_model(settings: Settings) -> str:
