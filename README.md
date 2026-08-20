@@ -3,7 +3,7 @@ title: Research AI
 emoji: 🚀
 colorFrom: blue
 colorTo: purple
-sdk: docker
+sdk: gradio
 pinned: false
 ---
 
@@ -21,7 +21,7 @@ Deployed on [Hugging Face Spaces](https://huggingface.co/spaces) with **Google G
 
 The Research AI platform is deployed as a **two-process architecture**:
 
-1. **Main Orchestrator (Docker Space)**: A FastAPI server that hosts the frontend, manages conversation state, and coordinates the agent swarm (Planner, Executor, Synthesis).
+1. **Main Orchestrator (Gradio Space)**: A FastAPI server that hosts the frontend, manages conversation state, and coordinates the agent swarm (Planner, Executor, Synthesis). Due to Hugging Face billing restrictions, this uses the Gradio SDK as a wrapper to run the FastAPI app for free.
 2. **ML Microservice (Gradio Space)**: A separate Hugging Face ZeroGPU Space that runs the computationally heavy ML models (FAISS search, classification, summarization).
 
 ```
@@ -82,7 +82,7 @@ DEV_MODE=true ./start.sh
 
 ## Hugging Face Spaces Deployment (Canonical)
 
-The ONLY supported production deployment target is **Hugging Face Spaces (Docker SDK)**.
+The ONLY supported production deployment target is **Hugging Face Spaces**.
 
 ### 1. Deploy the ML Microservice
 First, you must deploy the machine learning backend to a separate Space:
@@ -93,11 +93,11 @@ First, you must deploy the machine learning backend to a separate Space:
 
 ### 2. Deploy the Main Orchestrator
 Create a new Space for the frontend/API:
-- **SDK**: Docker
-- **Hardware**: CPU Basic (free tier is fine for the orchestrator)
+- **SDK**: Gradio (We use Gradio SDK to bypass Docker billing restrictions on new free accounts)
+- **Hardware**: CPU Basic (Free) or ZeroGPU
 - **Visibility**: Public
 
-Push this entire repository to the orchestrator Space. The `Dockerfile` at the root will automatically build and launch the FastAPI server on port 7860.
+Push this entire repository to the orchestrator Space. The `app.py` at the root will automatically build and launch the FastAPI server on port 7860.
 
 ### 3. Upload runtime artifacts to a HF Dataset
 Due to GitHub Git-LFS bandwidth limits, committing large artifacts (FAISS indexes, classification models) to git often results in broken pointer stubs. 
