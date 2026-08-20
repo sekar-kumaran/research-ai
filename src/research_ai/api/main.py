@@ -37,11 +37,13 @@ AUTHENTICATION:
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import os
 import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 # Load .env from project root before any settings are read
@@ -93,6 +95,67 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def _check_config() -> None:
+    """Emit clear, actionable startup warnings for missing config.
+
+    This runs inside the FastAPI lifespan handler so it executes regardless
+    of which entrypoint launches the process (uvicorn direct, app.py, Render,
+    HF Space Docker).  Previously it only ran via app.py which is NOT the
+    live Dockerfile CMD.
+    """
+    backend = os.getenv("LLM_BACKEND", "cloud").lower()
+    provider = os.getenv("CLOUD_LLM_PROVIDER", "gemini").lower()
+
+    if backend == "cloud":
+        if provider in ("gemini", "google"):
+            key = (
+                os.getenv("GEMINI_API_KEY", "").strip()
+                or os.getenv("GOOGLE_API_KEY", "").strip()
+            )
+            if not key:
+                logger.error(
+                    "═══════════════════════════════════════════════════════════════\n"
+                    "  GEMINI_API_KEY is not configured!\n"
+                    "  LLM synthesis and planning will fail.\n"
+                    "  Fix: HF Space → Settings → Repository secrets\n"
+                    "       Add secret: GEMINI_API_KEY = <your key>\n"
+                    "  Get a free key at: https://aistudio.google.com/\n"
+                    "═══════════════════════════════════════════════════════════════"
+                )
+        elif provider == "groq":
+            if not os.getenv("GROQ_API_KEY", "").strip():
+                logger.warning("GROQ_API_KEY is not set — Groq LLM will fail at first call.")
+        elif provider == "openrouter":
+            if not os.getenv("OPENROUTER_API_KEY", "").strip():
+                logger.warning("OPENROUTER_API_KEY is not set — OpenRouter LLM will fail at first call.")
+
+    hf_space_id = os.getenv("HF_SPACE_ID", "").strip()
+    if not hf_space_id:
+        logger.error(
+            "HF_SPACE_ID is not set — all ML search/classify/summarize endpoints will fail silently."
+        )
+
+    if os.getenv("ENABLE_PYTHON_EXECUTION", "false").lower() == "true":
+        logger.warning(
+            "ENABLE_PYTHON_EXECUTION=true — sandboxed Python execution is ON. "
+            "Disable this for public Hugging Face deployments."
+        )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan handler: run startup checks on every entrypoint path."""
+    _check_config()
+    logger.info(
+        "Research AI Intelligence Platform v3.1 started | backend=%s provider=%s",
+        os.getenv("LLM_BACKEND", "cloud"),
+        os.getenv("CLOUD_LLM_PROVIDER", "gemini"),
+    )
+    yield
+    # Shutdown logic (if needed) goes here
+
+
 settings = load_settings()
 platform = ResearchAIPlatform(settings)
 
@@ -123,9 +186,10 @@ app = FastAPI(
     title="Research AI Intelligence Platform",
     version="3.1.0",
     description=(
-        "Agentic scientific research intelligence platform with local ML, "
-        "BM25+FAISS hybrid retrieval, citation intelligence, and sandboxed execution."
+        "Agentic scientific research intelligence platform with hybrid retrieval, "
+        "citation intelligence, and remote ML microservice (Hugging Face Spaces)."
     ),
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -160,27 +224,76 @@ async def log_requests(request: Request, call_next):
     return response
 
 # ---------------------------------------------------------------------------
+# Rate Limiting Middleware
+# Basic in-memory rate limiting to prevent abuse on public deployments.
+# Limits to 100 requests per minute per IP.
+# ---------------------------------------------------------------------------
+from collections import defaultdict
+import time as time_module
+
+_rate_limits: dict[str, list[float]] = defaultdict(list)
+RATE_LIMIT_REQUESTS = 100
+RATE_LIMIT_WINDOW = 60.0
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    client_ip = request.client.host if request.client else "unknown"
+    now = time_module.time()
+    
+    # Filter old requests
+    _rate_limits[client_ip] = [t for t in _rate_limits[client_ip] if now - t < RATE_LIMIT_WINDOW]
+    
+    if len(_rate_limits[client_ip]) >= RATE_LIMIT_REQUESTS:
+        return Response(content="Too Many Requests", status_code=429)
+        
+    _rate_limits[client_ip].append(now)
+    return await call_next(request)
+
+# ---------------------------------------------------------------------------
 # Authentication middleware
 # Protects API endpoints if APP_PASSWORD is set.
+# NOTE: APP_PASSWORD is for single-operator deployments only. For a multi-user
+# production environment, replace this with JWT/OAuth2 per-user auth.
 # ---------------------------------------------------------------------------
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
+    """Authentication middleware.
+
+    IMPORTANT: Added OPTIONS bypass so CORS preflight requests are NEVER blocked
+    by auth — without this, a browser OPTIONS preflight gets a 401 before CORS
+    headers are applied, making every cross-origin request appear as a CORS error.
+    """
+    # Always allow OPTIONS (CORS preflight) through before auth check
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     app_password = os.getenv("APP_PASSWORD", "").strip()
     if app_password:
         path = request.url.path
         if path.startswith(("/chat", "/metadata", "/citation", "/knowledge-graph", "/pipeline", "/agent", "/ask", "/execution", "/classify", "/search", "/summarize", "/similarity", "/conversations")):
-            auth_header = request.headers.get("Authorization")
-            if not auth_header or not auth_header.startswith("Bearer ") or auth_header.split(" ")[1] != app_password:
+            auth_header = request.headers.get("Authorization", "")
+            # Use partition() for safe splitting — split()[1] throws IndexError on "Bearer" alone
+            scheme, _, token = auth_header.partition(" ")
+            token = token.strip()
+            if (
+                scheme != "Bearer"
+                or not token
+                # hmac.compare_digest: constant-time comparison prevents timing attacks
+                or not hmac.compare_digest(token, app_password)
+            ):
                 return Response(content="Unauthorized", status_code=401)
     return await call_next(request)
 
+
 @app.post("/login")
 def login(request: Request):
-    auth_header = request.headers.get("Authorization")
+    auth_header = request.headers.get("Authorization", "")
     app_password = os.getenv("APP_PASSWORD", "").strip()
     if not app_password:
         return {"status": "ok"}
-    if auth_header and auth_header.startswith("Bearer ") and auth_header.split(" ")[1] == app_password:
+    scheme, _, token = auth_header.partition(" ")
+    token = token.strip()
+    if scheme == "Bearer" and token and hmac.compare_digest(token, app_password):
         return {"status": "ok"}
     raise HTTPException(status_code=401, detail="Unauthorized")
 

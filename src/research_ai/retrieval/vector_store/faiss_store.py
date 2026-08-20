@@ -115,16 +115,46 @@ class FaissVectorStore:
         """Create a lazy store backed by artifact files (loaded on first search)."""
         return cls(artifact_dir=artifact_dir)
 
+    # Git-LFS pointer stub signature: starts with this exact string.
+    # A real FAISS file starts with binary magic bytes.  A real Parquet file
+    # starts with b'PAR1'.  If either file starts with this string it is an
+    # un-resolved LFS pointer and must be treated as absent.
+    _LFS_STUB_PREFIX = b"version https://git-lfs.github.com"
+    # Real FAISS IndexFlatIP files are at minimum a few MB; anything under 1KB
+    # is either an empty index or a stub.
+    _MIN_FAISS_BYTES = 1024
+
+    @staticmethod
+    def _is_real_file(path: Path, min_bytes: int = 0) -> bool:
+        """Return True if path is a real file (not an LFS stub) of adequate size."""
+        if not path.exists() or path.stat().st_size < max(min_bytes, 1):
+            return False
+        try:
+            with path.open("rb") as fh:
+                header = fh.read(36)  # len(LFS_STUB_PREFIX)
+            if header.startswith(FaissVectorStore._LFS_STUB_PREFIX):
+                logger.error(
+                    "Git-LFS pointer stub detected at %s — file was not resolved. "
+                    "Run `git lfs pull` or re-download via HF_ARTIFACTS_REPO.",
+                    path,
+                )
+                return False
+        except OSError:
+            return False
+        return True
+
     @property
     def ready(self) -> bool:
-        """True if the store is either already loaded or its artifact files exist."""
+        """True if the store is either already loaded or its artifact files exist AND are real."""
         if self.index is not None and not self.metadata.empty:
             return True
         if self.artifact_dir is None:
             return False
+        faiss_path = self.artifact_dir / "paper_index.faiss"
+        meta_path = self.artifact_dir / "paper_metadata.parquet"
         return (
-            (self.artifact_dir / "paper_index.faiss").exists()
-            and (self.artifact_dir / "paper_metadata.parquet").exists()
+            self._is_real_file(faiss_path, min_bytes=self._MIN_FAISS_BYTES)
+            and self._is_real_file(meta_path, min_bytes=1024)
         )
 
     @property
@@ -159,6 +189,20 @@ class FaissVectorStore:
             raise RuntimeError(
                 f"Vector store artifacts are missing in {self.artifact_dir}. "
                 "Run the embedding/indexing pipeline first."
+            )
+        # Guard against LFS pointer stubs: detect before passing to faiss.read_index()
+        # which would produce a cryptic low-level error instead of a clear message.
+        if not self._is_real_file(index_path, min_bytes=self._MIN_FAISS_BYTES):
+            raise RuntimeError(
+                f"{index_path} is either an unresolved Git-LFS pointer stub or is too small "
+                "to be a valid FAISS index.  Run `git lfs pull` or set HF_ARTIFACTS_REPO and "
+                "re-download via download_artifacts.py."
+            )
+        if not self._is_real_file(metadata_path, min_bytes=1024):
+            raise RuntimeError(
+                f"{metadata_path} is either an unresolved Git-LFS pointer stub or is too small "
+                "to be a valid Parquet file.  Run `git lfs pull` or set HF_ARTIFACTS_REPO and "
+                "re-download via download_artifacts.py."
             )
         self.index = faiss.read_index(str(index_path))
         self.metadata = pd.read_parquet(metadata_path)

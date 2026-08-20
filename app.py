@@ -13,8 +13,7 @@ Instead, it:
   2. Adds src/ to PYTHONPATH so `import research_ai` resolves correctly.
   3. Launches the real FastAPI application via uvicorn programmatically,
      binding to 0.0.0.0 and the HF-provided PORT (default 7860).
-  4. Wraps that server with a minimal Gradio shim so HF Space health checks
-     pass — the existing HTML/CSS/JS frontend remains the primary UI.
+  4. The existing HTML/CSS/JS frontend remains the primary UI.
 
 WHY NOT `gr.Interface(...)` OR `gr.ChatInterface(...)`?
 -------------------------------------------------------
@@ -78,43 +77,10 @@ if _env_path.exists():
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 # ---------------------------------------------------------------------------
-# 3. Runtime safety checks — emit clear errors for missing config
+# 3. (Legacy) Config checks moved to src/research_ai/api/main.py lifespan
 # ---------------------------------------------------------------------------
-
 def _check_config() -> None:
-    """Warn loudly about missing required config before the server starts."""
-    backend = os.getenv("LLM_BACKEND", "cloud").lower()
-    provider = os.getenv("CLOUD_LLM_PROVIDER", "").lower()
-
-    if backend == "cloud":
-        if provider in ("gemini", "google"):
-            key = (
-                os.getenv("GEMINI_API_KEY", "").strip()
-                or os.getenv("GOOGLE_API_KEY", "").strip()
-            )
-            if not key:
-                logger.error(
-                    "═══════════════════════════════════════════════════════\n"
-                    "  GEMINI_API_KEY is not configured!\n"
-                    "  The Research AI LLM features will not work.\n"
-                    "  Fix: HF Space → Settings → Repository secrets\n"
-                    "       Add secret: GEMINI_API_KEY = <your key>\n"
-                    "  Get a free key at: https://aistudio.google.com/\n"
-                    "═══════════════════════════════════════════════════════"
-                )
-        elif provider == "groq":
-            if not os.getenv("GROQ_API_KEY", "").strip():
-                logger.warning("GROQ_API_KEY is not set — Groq LLM will fail.")
-        elif provider == "openrouter":
-            if not os.getenv("OPENROUTER_API_KEY", "").strip():
-                logger.warning("OPENROUTER_API_KEY is not set — OpenRouter LLM will fail.")
-
-    # Python execution should be off for public deployments
-    if os.getenv("ENABLE_PYTHON_EXECUTION", "false").lower() == "true":
-        logger.warning(
-            "ENABLE_PYTHON_EXECUTION=true — sandboxed Python execution is ON. "
-            "Disable this for public Hugging Face deployments."
-        )
+    pass  # Logic moved to FastAPI lifespan handler so it runs on all entrypoints
 
 
 # ---------------------------------------------------------------------------

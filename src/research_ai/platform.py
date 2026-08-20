@@ -54,8 +54,9 @@ from research_ai.research.metadata import MetadataService
 from research_ai.research.paper_ingestion import PaperChatService
 from research_ai.research.trend_analysis import TrendAnalysisService
 from research_ai.retrieval.embeddings import EmbeddingService
-from research_ai.retrieval.hybrid_search import HybridSearchService
-from research_ai.retrieval.vector_store import FaissVectorStore
+# NOTE: HybridSearchService and FaissVectorStore are NOT used here — ML is
+# fully delegated to the remote Gradio microservice (HF_SPACE_ID).  These
+# imports are intentionally removed to avoid confusion about the architecture.
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +80,46 @@ class ResearchAIPlatform:
             (lambda: get_cloud_client()) if settings.llm.backend == "cloud" else None
         )
 
-        hf_space_id = os.environ.get("HF_SPACE_ID", "sekarkumaran461/research-ai")
-        
+        # ARCHITECTURE: This platform uses a REMOTE ML microservice architecture.
+        # All FAISS search, classification, summarization, clustering are handled
+        # by a separate Gradio Space (hf_microservice/app.py), NOT locally.
+        #
+        # HF_SPACE_ID MUST point at the separately deployed hf_microservice Space.
+        # It must NOT point at this app's own Space (which is a Docker/FastAPI app
+        # with no Gradio /config endpoint — connecting to it will always fail).
+        #
+        # Canonical value: "sekarkumaran461/research-ai-ml" (or similar microservice Space).
+        # If unset, startup will WARN loudly rather than silently degrade.
+        hf_space_id = os.environ.get("HF_SPACE_ID", "").strip()
+        if not hf_space_id:
+            logger.error(
+                "═══════════════════════════════════════════════════════════════\n"
+                "  HF_SPACE_ID is not set!\n"
+                "  ALL ML features (search, classify, summarize) will fail.\n"
+                "  Fix: set HF_SPACE_ID to your separately deployed Gradio\n"
+                "       microservice Space, e.g.:\n"
+                "       HF_SPACE_ID=sekarkumaran461/research-ai-ml\n"
+                "  The main FastAPI app's own Space URL will NOT work here.\n"
+                "═══════════════════════════════════════════════════════════════"
+            )
+            # Use a placeholder that will fail clearly on first call, not silently
+            hf_space_id = "__HF_SPACE_ID_NOT_SET__"
+        elif hf_space_id == "sekarkumaran461/research-ai":
+            # This is the main app's own Space — a Docker Space with no Gradio endpoints.
+            # Connecting here will always fail. Catch this specific mis-configuration.
+            logger.error(
+                "═══════════════════════════════════════════════════════════════\n"
+                "  HF_SPACE_ID is pointing at the MAIN app's own Space!\n"
+                "  This is a Docker/FastAPI app with no Gradio /config endpoint.\n"
+                "  gradio_client will fail to connect.\n"
+                "  Fix: set HF_SPACE_ID to the hf_MICROSERVICE Space ID, e.g.:\n"
+                "       HF_SPACE_ID=sekarkumaran461/research-ai-ml\n"
+                "═══════════════════════════════════════════════════════════════"
+            )
+
+        self._hf_space_id = hf_space_id
+        logger.info("Remote ML microservice: %s", hf_space_id)
+
         # --- Core infrastructure ---
         self.embedding_service = EmbeddingService(self._resolve_embedding_model(settings))
         self.retriever = RemoteHybridSearchService(hf_space_id)

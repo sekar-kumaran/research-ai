@@ -119,7 +119,7 @@ class CloudLLMClient:
                     time.sleep(wait)
                     continue
                 raise
-            except requests.Timeout as exc:
+            except requests.Timeout:
                 # Don't retry timeouts — they pile up and deadlock local servers
                 raise
             except requests.RequestException as exc:

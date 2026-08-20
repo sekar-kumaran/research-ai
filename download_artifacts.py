@@ -44,15 +44,33 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Artifacts required at runtime and their sizes (for logging).
-# Only the files that are too large to commit directly are listed here.
-# Small artifacts (FAISS index ~12 MB, paper_metadata ~5 MB) are committed
-# to the repo directly and do not need to be downloaded.
+# Files tracked by Git-LFS that must be downloaded from HF Dataset repo instead.
+# This includes both "too large to commit" files AND files that GitHub's LFS
+# bandwidth limits caused to become pointer stubs in the deployed container.
 _LARGE_ARTIFACTS = [
     # (path relative to repo root, approx size for logging)
     ("artifacts/classification/classifier.joblib", "~608 MB"),
     ("artifacts/clustering/kmeans.joblib", "~80 MB"),
     ("artifacts/clustering/cluster_assignments.parquet", "~7 MB"),
+    # FAISS similarity index and metadata \u2014 tracked by Git-LFS but frequently
+    # become un-resolved stubs on GitHub due to LFS bandwidth/storage limits.
+    # Must be downloaded from HF Dataset repo instead.
+    ("artifacts/similarity/paper_index.faiss", "~12 MB"),
+    ("artifacts/similarity/paper_metadata.parquet", "~5 MB"),
 ]
+
+# Git-LFS pointer stub prefix \u2014 files starting with this are NOT real artifacts.
+_LFS_STUB_PREFIX = b"version https://git-lfs.github.com"
+
+
+def _is_lfs_stub(path: Path) -> bool:
+    """Return True if a file is an unresolved Git-LFS pointer stub."""
+    try:
+        with path.open("rb") as fh:
+            return fh.read(36).startswith(_LFS_STUB_PREFIX)
+    except OSError:
+        return False
+
 
 
 def download_artifacts(repo_id: str) -> None:
@@ -84,9 +102,17 @@ def download_artifacts(repo_id: str) -> None:
         local_path = repo_root / rel_path
 
         if local_path.exists():
-            logger.info("Artifact already present — skipping: %s", rel_path)
-            skipped_count += 1
-            continue
+            if _is_lfs_stub(local_path):
+                logger.warning(
+                    "Artifact at %s is a Git-LFS pointer stub (not real data). "
+                    "Re-downloading from %s ...", rel_path, repo_id
+                )
+                local_path.unlink()  # remove stub so download proceeds
+            else:
+                logger.info("Artifact already present — skipping: %s", rel_path)
+                skipped_count += 1
+                continue
+
 
         # Ensure parent directory exists
         local_path.parent.mkdir(parents=True, exist_ok=True)

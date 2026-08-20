@@ -4,14 +4,16 @@
 ## Status: Active / Legacy
 
 ## Description
-This directory historically contained local implementations of machine learning models. In v3.1, heavy ML execution has been offloaded to the Hugging Face microservice via `proxy_services.py`. These files remain as interfaces or lightweight local fallbacks.
+This directory historically contained local implementations of machine learning models. In v3.1, heavy ML execution has been ENTIRELY offloaded to the remote Hugging Face microservice via `proxy_services.py`. 
+
+**CRITICAL NOTE**: The local classes (`SimilarityService`, `FaissVectorStore`, `ClassifierService`) are now largely legacy/dead code for execution. The `platform.py` explicitly delegates these responsibilities to `RemoteMLClient` and Gradio Space endpoints. They remain in the codebase primarily for interface definition or local-only CI testing, but are NEVER used in production execution.
 
 ## File Breakdown
 
 ### 1. `src/research_ai/ml_models/classifier/service.py`
-- **Class `ClassifierService`**: Local fallback for text classification.
+- **Class `ClassifierService`**: (Legacy) Local implementation for text classification.
 - **Functions**:
-  - `classify(title, abstract)`: If the remote HF space is down, this can run a lightweight local zero-shot classifier (if PyTorch is installed locally) to categorize a paper's subject area.
+  - `classify(title, abstract)`: Historically ran a local zero-shot classifier. Now superseded by `RemoteClassifierService` which hits the microservice `/classify` endpoint.
 
 ### 2. `src/research_ai/ml_models/methodology_extractor/service.py`
 - **Class `MethodologyExtractor`**: Local fallback for extracting research methods.

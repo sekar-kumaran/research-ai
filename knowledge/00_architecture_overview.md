@@ -4,15 +4,16 @@
 ## Description
 The Research AI Platform is a unified, agent-orchestrated intelligent assistant for academic research. The system is broken into three main tiers:
 
-1. **Frontend (Render/Browser)**
+1. **Frontend (Browser)**
    - Pure HTML/CSS/Vanilla JS interface.
    - Stream-based rendering using Server-Sent Events (SSE) to receive real-time updates from the backend orchestrator.
    - Maintains UI state (current conversation ID, loaded papers, UI themes).
 
-2. **Backend Application Server (Render/FastAPI)**
+2. **Backend Application Server (Hugging Face Spaces - Docker / FastAPI)**
+   - Single canonical deployment target via Docker on Hugging Face Spaces.
    - FastAPI server acting as the orchestration layer.
    - Uses `ResearchAIPlatform` to route user queries into the Agent System (`PlannerAgent`, `ExecutorAgent`, `SynthesisAgent`).
-   - Maintains in-memory session history and routes heavy ML requests to the remote Hugging Face space.
+   - Maintains in-memory session history and routes heavy ML requests to the remote Hugging Face ML microservice space.
 
 3. **Remote ML Engine (Hugging Face ZeroGPU Space)**
    - A separate microservice running on Hugging Face Spaces (using Gradio).

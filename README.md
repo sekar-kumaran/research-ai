@@ -19,11 +19,16 @@ Deployed on [Hugging Face Spaces](https://huggingface.co/spaces) with **Google G
 
 ## Architecture at a Glance
 
+The Research AI platform is deployed as a **two-process architecture**:
+
+1. **Main Orchestrator (Docker Space)**: A FastAPI server that hosts the frontend, manages conversation state, and coordinates the agent swarm (Planner, Executor, Synthesis).
+2. **ML Microservice (Gradio Space)**: A separate Hugging Face ZeroGPU Space that runs the computationally heavy ML models (FAISS search, classification, summarization).
+
 ```
 User Request
     │
     ▼
-FastAPI (src/research_ai/api/main.py)
+Main Orchestrator (FastAPI - src/research_ai/api/main.py)
     │
     ▼
 ResearchOrchestrator
@@ -34,11 +39,11 @@ ResearchOrchestrator
     └── SynthesisAgent      ← Gemini synthesis over grounded outputs
          │
          ▼
-    Tool Registry (13 tools)
-         ├── classify_query         (sklearn classifier on arXiv data)
-         ├── hybrid_search          (FAISS + BM25 + metadata reranking)
-         ├── smart_retrieve         (strategy-aware RetrievalAgent)
-         ├── summarize              (distilBART / cloud LLM)
+    Tool Registry 
+         └── Route to Remote ML Microservice (HF_SPACE_ID)
+                ├── classify_query         (sklearn classifier)
+                ├── hybrid_search          (FAISS + BM25)
+                └── summarizer             (scientific summarization)
          ├── methodology_extract    (regex NLP)
          ├── citation_signals       (category/year co-occurrence)
          ├── citation_proxy         (full proxy citation graph)
@@ -75,44 +80,37 @@ DEV_MODE=true ./start.sh
 
 ---
 
-## Hugging Face Spaces Deployment
+## Hugging Face Spaces Deployment (Canonical)
 
-### 1. Push the repository to a Gradio Space
+The ONLY supported production deployment target is **Hugging Face Spaces (Docker SDK)**.
 
-Create a new Space at https://huggingface.co/new-space with:
-- **SDK**: Gradio
-- **Hardware**: ZeroGPU (or CPU Basic for free tier)
+### 1. Deploy the ML Microservice
+First, you must deploy the machine learning backend to a separate Space:
+1. Create a new Space with the **Gradio** SDK.
+2. Select **ZeroGPU** hardware if available.
+3. Deploy the code from `hf_microservice/app.py` as the root of the Space.
+4. Note the Space ID (e.g., `your-name/research-ai-ml`).
+
+### 2. Deploy the Main Orchestrator
+Create a new Space for the frontend/API:
+- **SDK**: Docker
+- **Hardware**: CPU Basic (free tier is fine for the orchestrator)
 - **Visibility**: Public
 
-Push (or link) this repository to that Space. The `app.py` at the root is
-the HF entrypoint — it launches the real FastAPI server on port 7860.
+Push this entire repository to the orchestrator Space. The `Dockerfile` at the root will automatically build and launch the FastAPI server on port 7860.
 
-### 2. Upload runtime artifacts
-
-Commit these directly to the Space repo (small enough for standard git):
+### 3. Upload runtime artifacts to a HF Dataset
+Due to GitHub Git-LFS bandwidth limits, committing large artifacts (FAISS indexes, classification models) to git often results in broken pointer stubs. 
+Create a **Hugging Face Dataset Repo** and upload your artifacts there:
 
 | File | Size | Required |
 |---|---|---|
 | `artifacts/similarity/paper_index.faiss` | ~12 MB | ✅ Yes |
 | `artifacts/similarity/paper_metadata.parquet` | ~5 MB | ✅ Yes |
-| `artifacts/similarity/metadata_parts/part_00000.parquet` | ~25 MB | ✅ Yes |
-| `artifacts/similarity/embedding_model_name.joblib` | tiny | ✅ Yes |
-| `artifacts/classification/tfidf_vectorizer.joblib` | tiny | ✅ Yes |
-| `artifacts/classification/labels.joblib` | tiny | ✅ Yes |
-| `artifacts/classification/classifier.joblib` | ~608 MB | ⚠️ Git LFS |
+| `artifacts/classification/classifier.joblib` | ~608 MB | ✅ Yes |
 | `artifacts/clustering/kmeans.joblib` | ~80 MB | Optional |
 
-For `classifier.joblib` (608 MB), use **Git LFS**:
-```bash
-git lfs install
-git lfs track "*.joblib"
-git add .gitattributes
-git add artifacts/classification/classifier.joblib
-git commit -m "feat: add classifier artifact via LFS"
-```
-
-Alternatively host it on a HF Dataset repo and set `HF_ARTIFACTS_REPO` — the
-`download_artifacts.py` script will fetch it at startup.
+The orchestrator's startup script (`download_artifacts.py`) will automatically fetch these if you configure `HF_ARTIFACTS_REPO`.
 
 ### 3. Set Hugging Face Secrets
 
@@ -121,12 +119,12 @@ Alternatively host it on a HF Dataset repo and set `HF_ARTIFACTS_REPO` — the
 | Secret Name | Value | Required |
 |---|---|---|
 | `GEMINI_API_KEY` | Your Gemini API key from https://aistudio.google.com | ✅ Required |
+| `HF_SPACE_ID` | `your-name/research-ai-ml` (ID of the Microservice) | ✅ Required |
+| `HF_ARTIFACTS_REPO` | `your-name/research-ai-artifacts` | ✅ Required |
 | `LLM_BACKEND` | `cloud` | ✅ Required |
 | `CLOUD_LLM_PROVIDER` | `gemini` | ✅ Required |
 | `GEMINI_MODEL` | `gemini-3.5-flash` | Optional |
-| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Optional |
 | `ENABLE_PYTHON_EXECUTION` | `false` | Optional (already default) |
-| `HF_ARTIFACTS_REPO` | `your-name/research-ai-artifacts` | Only if using HF Dataset for large artifacts |
 
 ---
 
