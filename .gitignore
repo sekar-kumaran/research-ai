@@ -31,6 +31,10 @@ artifacts/feature_engineering/
 artifacts/classification/classifier.joblib
 artifacts/clustering/kmeans.joblib
 artifacts/clustering/cluster_assignments.parquet
+# FAISS index and metadata (downloaded via download_artifacts.py or HF_ARTIFACTS_REPO)
+artifacts/similarity/paper_index.faiss
+artifacts/similarity/paper_metadata.parquet
+artifacts/similarity/embedding_model_name.joblib
 
 # ── Local screenshots and UI captures ────────────────────────────────────────
 screen_*.png
