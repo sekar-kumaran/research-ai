@@ -1,0 +1,39 @@
+# Source control
+.git
+.gitignore
+
+# Secrets — never in image
+.env
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+
+# HUGE training/processing data — NOT needed at runtime
+artifacts/processed/
+artifacts/showcase/
+artifacts/feature_engineering/
+artifacts/artifacts/clustering/kmeans.joblib
+
+# Raw datasets — training only
+dataset/
+data/
+
+# HuggingFace microservice — separate deployment, not part of main app
+hf_microservice/
+
+# Dev tools
+venv/
+.venv/
+node_modules/
+notebooks/
+screenshots/
+lfs/
+.ipynb_checkpoints
+
+# Temp / editor
+*.swp
+*.swo
+.DS_Store

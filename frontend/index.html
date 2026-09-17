@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Research AI — Intelligent Research Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SIDEBAR — history, upload, settings (not mode selection)
+       The user never picks a mode; the AI decides internally.
+  ═══════════════════════════════════════════════════════════════ -->
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Logo + new chat -->
+    <div class="sidebar-top">
+      <div class="logo">
+        <div class="logo-mark">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 5v10M5 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <span class="logo-text">Research<strong>AI</strong></span>
+      </div>
+      <button class="new-chat-btn" id="newChatBtn" title="New conversation">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        New chat
+      </button>
+    </div>
+
+    <!-- Conversation history -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Recent</div>
+      <div id="historyList" class="history-list"></div>
+    </div>
+
+    <!-- Upload documents -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Documents</div>
+      <div class="upload-area" id="uploadArea">
+        <label class="upload-trigger" for="pdfUpload">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 1v8M4 4l3-3 3 3M1 11h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Upload PDF / TXT
+          <input type="file" id="pdfUpload" accept=".pdf,.txt" hidden multiple />
+        </label>
+        <div class="arxiv-row">
+          <input type="text" id="arxivInput" placeholder="arXiv ID e.g. 2303.08774" class="arxiv-input" />
+          <button id="loadArxivBtn" class="arxiv-load-btn">Load</button>
+        </div>
+        <div id="loadedDocs" class="loaded-docs"></div>
+      </div>
+    </div>
+
+    <!-- Available models (shown when Ollama is detected) -->
+    <div class="sidebar-section" id="modelsSection" style="display:none">
+      <div class="sidebar-section-label">Local Models</div>
+      <div id="modelsList" class="models-list"></div>
+    </div>
+
+    <!-- Settings -->
+    <div class="sidebar-section sidebar-settings">
+      <div class="sidebar-section-label">Settings</div>
+      <div class="setting-row">
+        <label for="topKSlider">Sources <span id="topKVal">5</span></label>
+        <input type="range" id="topKSlider" min="1" max="15" value="5" class="slider" />
+      </div>
+      <div class="setting-row">
+        <label for="debugToggle">Debug mode</label>
+        <input type="checkbox" id="debugToggle" class="toggle-check" />
+      </div>
+      <div class="setting-row">
+        <label>Theme</label>
+        <button id="themeToggle" class="theme-btn">
+          <span id="themeIcon">☀</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="sidebar-status" id="statusBar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Connecting…</span>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       MAIN — pure chat area (no mode selector)
+  ═══════════════════════════════════════════════════════════════ -->
+  <main class="main welcome-active" id="main">
+
+    <!-- ── Topbar ─────────────────────────────────────────────────────────── -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="topbar-btn sidebar-toggle" id="mobileMenuBtn" style="display:none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <span class="topbar-title">Research AI</span>
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-btn" id="exportBtn" title="Export Chat to Markdown">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Export
+        </button>
+        <button class="topbar-btn" id="kgBtn" title="View Knowledge Graph">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+          Graph
+        </button>
+        <button class="topbar-btn" id="loginHeaderBtn" title="Login / Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          Login
+        </button>
+      </div>
+    </div>
+
+    <!-- Welcome screen (shown when no messages) -->
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+          <circle cx="28" cy="28" r="27" stroke="currentColor" stroke-width="1" opacity="0.2"/>
+          <circle cx="28" cy="28" r="18" stroke="currentColor" stroke-width="1" opacity="0.4"/>
+          <circle cx="28" cy="28" r="10" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M21 28h14M28 21v14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1 class="welcome-title" id="welcomeTitle">Hello Researcher, what is today's research?</h1>
+      <p class="welcome-sub">Ask anything. I'll automatically search papers, extract evidence,<br/>and synthesize a grounded answer — no manual tool selection needed.</p>
+
+      <div class="capability-grid">
+        <div class="capability-card">
+          <div class="cap-icon">🔍</div>
+          <div class="cap-label">Semantic Search</div>
+          <div class="cap-desc">FAISS + BM25 hybrid over indexed arXiv papers</div>
+        </div>
+        <div class="capability-card">
+          <div class="cap-icon">🧠</div>
+          <div class="cap-label">AI Orchestration</div>
+          <div class="cap-desc">Planner decides which tools to invoke automatically</div>
+        </div>
+        <div class="capability-card">
+          <div class="cap-icon">📚</div>
+          <div class="cap-label">Grounded Answers</div>
+          <div class="cap-desc">Every claim backed by retrieved evidence with citations</div>
+        </div>
+        <div class="capability-card">
+          <div class="cap-icon">💬</div>
+          <div class="cap-label">Conversational</div>
+          <div class="cap-desc">Follow-up questions with full conversation memory</div>
+        </div>
+      </div>
+
+      <div class="example-queries" id="exampleQueries">
+        <button class="example-chip">What are recent advances in graph neural networks for drug discovery?</button>
+        <button class="example-chip">How has diffusion model research evolved since 2020?</button>
+        <button class="example-chip">Which papers on BERT used attention for NLP classification?</button>
+        <button class="example-chip">Explain the methodology behind AlphaFold's structure prediction</button>
+        <button class="example-chip">Find papers on reinforcement learning from human feedback</button>
+        <button class="example-chip">What are the most cited papers on transformer attention mechanisms?</button>
+      </div>
+    </div>
+
+    <!-- Chat messages area -->
+    <div class="chat-area" id="chatArea" style="display:none"></div>
+
+    <!-- Input composer -->
+    <div class="composer-wrap" id="composerWrap">
+      <div class="composer" id="composer">
+        <div class="composer-left">
+          <!-- File attach button -->
+          <button class="composer-attach" id="composerAttach" title="Upload document">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M13 7.5a5.5 5.5 0 0 1-5.5 5.5H4A3.5 3.5 0 0 1 4 6h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <path d="M9 3v7M7 5l2-2 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <input type="file" id="composerFile" accept=".pdf,.txt" hidden multiple />
+        </div>
+        <textarea
+          id="chatInput"
+          rows="1"
+          placeholder="Ask a research question… (Enter to send, Shift+Enter for newline)"
+          aria-label="Message"
+        ></textarea>
+        <button class="send-btn" id="sendBtn" title="Send" disabled>
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <path d="M14 1L1 7l5 2.5L8 14l6-13z" fill="currentColor"/>
+          </svg>
+        </button>
+      </div>
+      <p class="composer-hint">Research AI may make mistakes. Always verify critical information.</p>
+    </div>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PAPER VIEWER MODAL — shown when user clicks "View" on a source
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modalOverlay" style="display:none">
+    <div class="modal" id="paperModal">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle"></div>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       KNOWLEDGE GRAPH MODAL
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="kgOverlay" style="display:none; z-index: 999; align-items: center; justify-content: center;">
+    <div class="modal" style="width: 90%; max-width: 600px; padding: 24px; border-radius: 12px; background: var(--bg-2);">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+        <h2 style="margin: 0; font-size: 18px; color: var(--text);">Knowledge Graph</h2>
+        <button id="kgClose" style="background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 20px;">&times;</button>
+      </div>
+      <div id="kgContent" style="color: var(--text-2); font-size: 14px; max-height: 400px; overflow-y: auto;">
+        Loading knowledge graph...
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       LOGIN MODAL
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="loginOverlay" style="display:none; z-index: 10000; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
+    <div class="modal auth-modal">
+      <h2>ResearchAI Account</h2>
+      <p>Sign in to keep research chats, saved papers, and settings persistent.</p>
+      <div class="auth-tabs">
+        <button id="authLoginTab" class="auth-tab active" type="button">Login</button>
+        <button id="authSignupTab" class="auth-tab" type="button">Signup</button>
+      </div>
+      <input type="email" id="loginEmail" placeholder="Email or username" class="auth-input" autocomplete="username" />
+      <input type="text" id="signupUsername" placeholder="Username" class="auth-input signup-only" autocomplete="username" style="display:none" />
+      <input type="password" id="loginPassword" placeholder="Password" class="auth-input" autocomplete="current-password" />
+      <button id="loginBtn" class="auth-submit">Login</button>
+      <div id="loginError" class="auth-error" style="display: none;">Invalid login</div>
+    </div>
+  </div>
+
+  <script src="/static/js/state.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/history.js"></script>
+  <script src="/static/js/chat.js"></script>
+  <script src="/static/js/documents.js"></script>
+  <script src="/static/js/ui.js"></script>
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

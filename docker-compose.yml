@@ -1,0 +1,67 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://researchai:researchai@postgres:5432/researchai
+      DATA_ROOT: /data
+      ARTIFACTS_ROOT: /artifacts
+      LLM_BACKEND: cloud
+      CLOUD_LLM_PROVIDER: ollama
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      PRIMARY_MODEL: ${PRIMARY_MODEL:-gpt-oss:120b-cloud}
+      REASONING_MODEL: ${REASONING_MODEL:-gpt-oss:120b-cloud}
+      FAST_MODEL: ${FAST_MODEL:-gpt-oss:20b-cloud}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+      MODEL_LOCAL_FILES_ONLY: "true"
+      HF_HOME: /root/.cache/huggingface
+      TRANSFORMERS_CACHE: /root/.cache/huggingface/hub
+    ports:
+      - "7860:7860"
+    volumes:
+      - research_data:/data
+      # Mount only the ~72MB of runtime artifacts — not the 6.8GB training data
+      # Note: classifier/clustering live in ./artifacts/artifacts/ on disk
+      # but the app reads them from /artifacts/classification|clustering (ARTIFACTS_ROOT=/artifacts)
+      - ./artifacts/artifacts/classification:/artifacts/classification:ro
+      - ./artifacts/artifacts/clustering:/artifacts/clustering:ro
+      - ./artifacts/similarity:/artifacts/similarity:ro
+      - ./frontend:/app/frontend:ro
+      # Mount host HuggingFace model cache — avoids re-downloading all-MiniLM-L6-v2
+      - C:/Users/sekar/.cache/huggingface:/root/.cache/huggingface:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: researchai
+      POSTGRES_USER: researchai
+      POSTGRES_PASSWORD: researchai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U researchai -d researchai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  research_data:
+  ollama_data:
