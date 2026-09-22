@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: research-ai-backend
+  namespace: research-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: research-ai-backend
+  template:
+    metadata:
+      labels:
+        app: research-ai-backend
+    spec:
+      containers:
+        - name: backend
+          image: research-ai:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7860
+          envFrom:
+            - configMapRef:
+                name: research-ai-config
+            - secretRef:
+                name: research-ai-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: artifacts
+              mountPath: /artifacts
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: research-ai-data
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: research-ai-artifacts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: research-ai-backend
+  namespace: research-ai
+spec:
+  selector:
+    app: research-ai-backend
+  ports:
+    - name: http
+      port: 7860
+      targetPort: http
+  type: ClusterIP

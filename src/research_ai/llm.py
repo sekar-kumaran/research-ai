@@ -9,18 +9,43 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# Singleton cache: one client per (provider, model) pair, lazily built
+# Singleton cache: one client per (provider, model) pair, lazily built.
+# The cache key includes the base_url so a provider URL change also forces a new client.
 _CLIENT_CACHE: dict[str, "CloudLLMClient"] = {}
 
 
 def get_cloud_client() -> "CloudLLMClient":
-    """Return a cached CloudLLMClient or raise ValueError if config is missing."""
+    """Return a cached CloudLLMClient for the current env configuration.
+
+    The cache key is (provider, base_url) so changing CLOUD_LLM_PROVIDER or
+    the base URL in .env always creates a fresh client on the next call.
+    Previously the key was only provider, meaning a restart was needed to
+    switch from google -> omnirouter even if .env was updated.
+    """
     provider = os.getenv("CLOUD_LLM_PROVIDER", "groq").strip().lower()
     if provider == "gemini":
         provider = "google"
-    if provider not in _CLIENT_CACHE:
-        _CLIENT_CACHE[provider] = CloudLLMClient()
-    return _CLIENT_CACHE[provider]
+    # Build a cache key that covers both provider AND base URL so a config change
+    # (e.g. switching OMNIROUTER_BASE_URL) automatically triggers a new client.
+    if provider == "omnirouter":
+        base = os.getenv("OMNIROUTER_BASE_URL", "http://localhost:20218/v1")
+    elif provider == "ollama":
+        base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    elif provider == "openrouter":
+        base = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    elif provider == "groq":
+        base = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+    elif provider in ("custom", "openai", "compatible"):
+        base = os.getenv("LLM_API_BASE_URL", "https://api.openai.com/v1")
+    else:
+        base = provider
+    cache_key = f"{provider}::{base}"
+    if cache_key not in _CLIENT_CACHE:
+        # Evict any stale client for a *different* provider that may have been
+        # created before .env was loaded (e.g. old google singleton).
+        _CLIENT_CACHE.clear()
+        _CLIENT_CACHE[cache_key] = CloudLLMClient()
+    return _CLIENT_CACHE[cache_key]
 
 
 class ModelRouter:
@@ -44,7 +69,7 @@ class ModelRouter:
 
 
 class CloudLLMClient:
-    """OpenAI-compatible client for Groq / OpenRouter / OmniRouter / Google Gemini / Ollama.
+    """Client for Google Gemini, Ollama, and OpenAI-compatible LLM APIs.
 
     OmniRouter is a local OpenAI-compatible proxy (http://localhost:20218/v1) that
     routes to many upstream providers (Gemini, Claude, GPT, etc.) automatically.
@@ -99,9 +124,13 @@ class CloudLLMClient:
             self.base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
             self.model = os.getenv("OLLAMA_MODEL", os.getenv("PRIMARY_MODEL", "gpt-oss:120b-cloud"))
             self._api_key_env = "OLLAMA_API_KEY"
+        elif self.provider in ("custom", "openai", "compatible"):
+            self.base_url = os.getenv("LLM_API_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+            self.model = os.getenv("LLM_MODEL", os.getenv("PRIMARY_MODEL", "gpt-4o-mini"))
+            self._api_key_env = "LLM_API_KEY"
         else:
             raise ValueError(f"Unsupported CLOUD_LLM_PROVIDER: '{self.provider}'. "
-                             f"Choose from: groq, openrouter, omnirouter, google, gemini, ollama.")
+                             f"Choose a built-in provider or use custom with LLM_API_BASE_URL.")
 
     @property
     def api_key(self) -> str:

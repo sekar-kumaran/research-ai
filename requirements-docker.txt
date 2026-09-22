@@ -31,4 +31,4 @@ python-dotenv>=1.0.0
 polars>=1.8.0
 
 # NOT included (HuggingFace microservice only, not the main app):
-# gradio, gradio_client, huggingface_hub, spaces
+# gradio, gradio_client, spaces

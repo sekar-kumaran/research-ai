@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: research-ai-config
+  namespace: research-ai
+data:
+  HOST: "0.0.0.0"
+  PORT: "7860"
+  DATA_ROOT: "/data"
+  ARTIFACTS_ROOT: "/artifacts"
+  LLM_BACKEND: "cloud"
+  CLOUD_LLM_PROVIDER: "custom"
+  LLM_API_BASE_URL: "https://api.openai.com/v1"
+  LLM_MODEL: "gpt-4o-mini"
+  PRIMARY_MODEL: "gpt-4o-mini"
+  REASONING_MODEL: "gpt-4o-mini"
+  FAST_MODEL: "gpt-4o-mini"
+  EMBEDDING_MODEL: "all-MiniLM-L6-v2"
+  MODEL_LOCAL_FILES_ONLY: "false"
+  ENABLE_PYTHON_EXECUTION: "false"
+  ARXIV_ENABLED: "true"
+  CROSSREF_ENABLED: "true"
+  OPENALEX_ENABLED: "true"
+  ALLOWED_ORIGINS: "*"
+  MAX_UPLOAD_MB: "50"

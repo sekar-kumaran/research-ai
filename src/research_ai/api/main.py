@@ -46,19 +46,23 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-# Load .env from project root before any settings are read
+# Load .env from project root before any settings are read.
+# override=True: .env values ALWAYS win over any stale OS env vars
+# from a previous session or container launch. Without this, changing
+# CLOUD_LLM_PROVIDER in .env has no effect if the old value is still
+# in the process environment (e.g. after switching google -> omnirouter).
 _env_path = Path(__file__).resolve().parents[3] / ".env"
 if _env_path.exists():
     try:
         from dotenv import load_dotenv
-        load_dotenv(_env_path, override=False)
+        load_dotenv(_env_path, override=True)
     except ImportError:
-        # dotenv not installed — parse manually
+        # dotenv not installed — parse manually, always override
         for _line in _env_path.read_text().splitlines():
             _line = _line.strip()
             if _line and not _line.startswith("#") and "=" in _line:
                 _k, _v = _line.split("=", 1)
-                os.environ.setdefault(_k.strip(), _v.strip())
+                os.environ[_k.strip()] = _v.strip()
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -142,9 +146,23 @@ def _check_config() -> None:
         elif provider == "groq":
             if not os.getenv("GROQ_API_KEY", "").strip():
                 logger.warning("GROQ_API_KEY is not set — Groq LLM will fail at first call.")
+        elif provider == "omnirouter":
+            base = os.getenv("OMNIROUTER_BASE_URL", "http://localhost:20218/v1").strip()
+            model = os.getenv("PRIMARY_MODEL", "auto/best-chat").strip()
+            logger.info(
+                "OmniRouter provider configured: base=%s model=%s", base, model
+            )
         elif provider == "openrouter":
             if not os.getenv("OPENROUTER_API_KEY", "").strip():
                 logger.warning("OPENROUTER_API_KEY is not set — OpenRouter LLM will fail at first call.")
+        elif provider in ("custom", "openai", "compatible"):
+            logger.info(
+                "OpenAI-compatible LLM configured: base=%s model=%s",
+                os.getenv("LLM_API_BASE_URL", "https://api.openai.com/v1"),
+                os.getenv("LLM_MODEL", os.getenv("PRIMARY_MODEL", "gpt-4o-mini")),
+            )
+            if not os.getenv("LLM_API_KEY", "").strip():
+                logger.warning("LLM_API_KEY is not set — custom LLM calls may fail at first call.")
 
     if os.getenv("ENABLE_PYTHON_EXECUTION", "false").lower() == "true":
         logger.warning(
@@ -155,15 +173,44 @@ def _check_config() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """FastAPI lifespan handler: run startup checks on every entrypoint path."""
+    """FastAPI lifespan handler: run startup checks and pre-warm lazy services."""
     _check_config()
     logger.info(
         "Research AI Intelligence Platform v3.1 started | backend=%s provider=%s",
         os.getenv("LLM_BACKEND", "cloud"),
         os.getenv("CLOUD_LLM_PROVIDER", "ollama"),
     )
+
+    # Pre-warm lazy services in a background thread so the first user request
+    # doesn't block for 60-120s loading the embedding model + FAISS index.
+    # This runs concurrently with uvicorn accepting connections.
+    def _prewarm() -> None:
+        try:
+            logger.info("[PREWARM] Loading embedding model + FAISS index + classifier...")
+            # 1. Embedding model warm-up
+            if hasattr(platform.embedding_service, "warm_up"):
+                platform.embedding_service.warm_up()
+            else:
+                platform.embedding_service.encode("warmup query")
+            # 2. FAISS vector store — encode returns 1D, search expects 2D
+            import numpy as np
+            vec = platform.embedding_service.encode("warmup query")
+            if vec.ndim == 1:
+                vec = vec.reshape(1, -1)
+            platform.vector_store.search(vec, top_k=1)
+            # 3. Classifier
+            if platform.classifier.ready:
+                platform.classifier.classify("warmup title", "warmup abstract")
+            logger.info("[PREWARM] All services warm — first query will be fast.")
+        except Exception as exc:
+            logger.warning("[PREWARM] Pre-warm failed (non-fatal): %s", exc)
+
+    import threading
+    threading.Thread(target=_prewarm, name="prewarm", daemon=True).start()
+
     yield
     # Shutdown logic (if needed) goes here
+
 
 
 settings = load_settings()
