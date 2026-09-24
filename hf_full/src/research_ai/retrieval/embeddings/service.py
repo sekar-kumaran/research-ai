@@ -84,10 +84,17 @@ class EmbeddingService:
         """Lazily loaded SentenceTransformer instance."""
         if self._model is None:
             logger.info("Loading embedding model: %s", self._model_name)
+            os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+            os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
             from sentence_transformers import SentenceTransformer
             local_only = os.getenv("MODEL_LOCAL_FILES_ONLY", "false").lower() == "true"
             try:
-                self._model = SentenceTransformer(self._model_name, local_files_only=local_only)
+                hf_token = os.getenv("HF_TOKEN")
+                self._model = SentenceTransformer(
+                    self._model_name, 
+                    local_files_only=local_only,
+                    token=hf_token
+                )
             except Exception as exc:
                 mode = "local cache only" if local_only else "download enabled"
                 raise RuntimeError(

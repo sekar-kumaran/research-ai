@@ -5,16 +5,8 @@ from research_ai.retrieval.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
-try:
-    import spaces
-    ZEROGPU_AVAILABLE = True
-except ImportError:
-    ZEROGPU_AVAILABLE = False
-    # Mock spaces for local execution if not available
-    class spaces:
-        @staticmethod
-        def GPU(func):
-            return func
+import spaces
+ZEROGPU_AVAILABLE = True
 
 # Global model instance for ZeroGPU
 # ZeroGPU expects models to be placed on CUDA at module scope or via globals
@@ -24,9 +16,16 @@ def init_global_model(model_name: str, device: str = "cpu"):
     global global_embedding_model
     if global_embedding_model is None:
         logger.info("Initializing global ZeroGPU embedding model...")
+        os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+        os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
         from sentence_transformers import SentenceTransformer
         local_only = os.getenv("MODEL_LOCAL_FILES_ONLY", "false").lower() == "true"
-        global_embedding_model = SentenceTransformer(model_name, local_files_only=local_only)
+        hf_token = os.getenv("HF_TOKEN")
+        global_embedding_model = SentenceTransformer(
+            model_name, 
+            local_files_only=local_only,
+            token=hf_token
+        )
         
         target = "cuda" if (device == "cuda" or (device == "auto" and ZEROGPU_AVAILABLE)) else "cpu"
         if target == "cuda":
