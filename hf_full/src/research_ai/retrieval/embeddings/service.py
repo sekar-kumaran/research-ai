@@ -85,7 +85,7 @@ class EmbeddingService:
         if self._model is None:
             logger.info("Loading embedding model: %s", self._model_name)
             from sentence_transformers import SentenceTransformer
-            local_only = os.getenv("MODEL_LOCAL_FILES_ONLY", "true").lower() != "false"
+            local_only = os.getenv("MODEL_LOCAL_FILES_ONLY", "false").lower() == "true"
             try:
                 self._model = SentenceTransformer(self._model_name, local_files_only=local_only)
             except Exception as exc:

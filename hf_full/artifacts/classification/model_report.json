@@ -1,0 +1,33 @@
+{
+  "model": "SGDClassifier(hinge)",
+  "n_classes": 26,
+  "test_accuracy": 0.7322,
+  "classes": [
+    "astro-ph",
+    "astro-ph.CO",
+    "astro-ph.EP",
+    "astro-ph.GA",
+    "astro-ph.HE",
+    "astro-ph.IM",
+    "astro-ph.SR",
+    "cond-mat",
+    "cs",
+    "econ",
+    "eess",
+    "gr-qc",
+    "hep-ex",
+    "hep-lat",
+    "hep-ph",
+    "hep-th",
+    "math",
+    "math-ph",
+    "nlin",
+    "nucl-ex",
+    "nucl-th",
+    "physics",
+    "q-bio",
+    "q-fin",
+    "quant-ph",
+    "stat"
+  ]
+}

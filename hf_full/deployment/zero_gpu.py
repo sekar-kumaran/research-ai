@@ -25,7 +25,7 @@ def init_global_model(model_name: str, device: str = "cpu"):
     if global_embedding_model is None:
         logger.info("Initializing global ZeroGPU embedding model...")
         from sentence_transformers import SentenceTransformer
-        local_only = os.getenv("MODEL_LOCAL_FILES_ONLY", "true").lower() != "false"
+        local_only = os.getenv("MODEL_LOCAL_FILES_ONLY", "false").lower() == "true"
         global_embedding_model = SentenceTransformer(model_name, local_files_only=local_only)
         
         target = "cuda" if (device == "cuda" or (device == "auto" and ZEROGPU_AVAILABLE)) else "cpu"
